@@ -1,0 +1,114 @@
+/* ── Shift Briefing — Global Design System ─────────────────── */
+
+/* Google Fonts are loaded via next/font in layout.tsx */
+
+/* ── CSS Variables (Design Tokens) ─────────────────────────── */
+:root {
+  /* Brand */
+  --teal: #016a71;
+  --teal-light: #3fb6ba;
+  --teal-pale: #78c9cb;
+  --teal-bg: #1f2726;
+  --teal-border: #24403f;
+  --teal-hover: #068189;
+  --teal-border-l: #0a8b93;
+  --teal-text: #eafcfc;
+  --teal-glow: #e8fbfb;
+
+  /* Urgent */
+  --urgent: #e2603f;
+  --urgent-bg: #2a1d1a;
+  --urgent-border: #4a2a22;
+
+  /* High */
+  --high: #d8a24a;
+
+  /* Backgrounds */
+  --bg-0: #171615;
+  --bg-1: #131211;
+  --bg-2: #1a1917;
+  --bg-3: #1c1b19;
+  --bg-4: #1e1d1b;
+  --bg-5: #1f1e1c;
+  --bg-6: #201f1c;
+  --bg-7: #221f1d;
+  --bg-8: #232120;
+  --bg-9: #242220;
+  --bg-urgent-row: #1e1b19;
+
+  /* Borders */
+  --border-0: #232120;
+  --border-1: #262421;
+  --border-2: #292724;
+  --border-3: #2b2926;
+  --border-4: #302e2b;
+  --border-5: #35322e;
+  --border-6: #3a3733;
+  --border-7: #4a4642;
+
+  /* Text */
+  --text-primary: #f2efea;
+  --text-secondary: #d8d3cb;
+  --text-secondary-strong: #e6e1d9;
+  --text-tertiary: #c9c3ba;
+  --text-muted: #a8a29a;
+  --text-dim: #8f8a81;
+  --text-dimmer: #7f7a72;
+  --text-dimmest: #6f6a63;
+  --text-ghost: #5c5852;
+
+  /* Fonts */
+  --font-sans: var(--font-inter), 'Inter', Helvetica, Arial, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), 'JetBrains Mono', monospace;
+}
+
+/* ── Reset ─────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg-0);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Links ─────────────────────────────────────────────────── */
+a {
+  color: var(--teal-light);
+  text-decoration: none;
+}
+a:hover {
+  color: #6fd0d3;
+}
+
+/* ── Selection ─────────────────────────────────────────────── */
+::selection {
+  background: var(--teal);
+  color: #fff;
+}
+
+/* ── Inputs ────────────────────────────────────────────────── */
+input, textarea, button {
+  font-family: inherit;
+}
+
+/* ── Custom Scrollbar (global) ─────────────────────────────── */
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-6);
+  border-radius: 10px;
+  border: 3px solid var(--bg-0);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}

@@ -1,0 +1,64 @@
+.transcript {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 660px;
+}
+
+.entry {
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border-left: 2px solid var(--border-6);
+  transition: all 0.15s ease;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.ts {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dimmest);
+  transition: color 0.15s ease;
+}
+.tsActive {
+  color: var(--teal-pale);
+}
+
+.speaker {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  transition: color 0.15s ease;
+}
+.speakerFlag {
+  color: var(--urgent);
+}
+.speakerActive {
+  color: var(--teal-pale);
+}
+
+.flagBadge {
+  padding: 1px 6px;
+  border-radius: 5px;
+  font-size: 10px;
+  background: var(--urgent-bg);
+  color: var(--urgent);
+  border: 1px solid var(--urgent-border);
+}
+
+.text {
+  margin-top: 5px;
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text-tertiary);
+  text-wrap: pretty;
+  transition: color 0.15s ease;
+}
+.textActive {
+  color: var(--text-primary);
+}

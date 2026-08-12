@@ -1,0 +1,73 @@
+.wrapper {
+  padding: 12px 14px 14px;
+  border-top: 1px solid var(--border-1);
+  background: var(--bg-0);
+}
+
+.suggestions {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 9px;
+  flex-wrap: wrap;
+}
+
+.suggestion {
+  padding: 5px 9px;
+  border-radius: 8px;
+  border: 1px solid var(--border-4);
+  background: var(--bg-5);
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.suggestion:hover {
+  border-color: var(--teal-border-l);
+  color: var(--text-secondary);
+}
+
+.inputRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 8px 8px 12px;
+  border: 1px solid var(--border-5);
+  border-radius: 11px;
+  background: var(--bg-5);
+  transition: border-color 0.15s ease;
+}
+.inputRow:focus-within {
+  border-color: var(--teal-border-l);
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13.5px;
+  padding: 5px 0;
+  font-family: inherit;
+}
+.input::placeholder {
+  color: var(--text-dimmest);
+}
+
+.sendBtn {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--teal-border-l);
+  background: var(--teal);
+  color: var(--teal-text);
+  font-size: 12.5px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.sendBtn:hover {
+  background: var(--teal-hover);
+}

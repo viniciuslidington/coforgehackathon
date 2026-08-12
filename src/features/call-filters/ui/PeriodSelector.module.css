@@ -1,0 +1,32 @@
+.wrapper {
+  display: flex;
+  padding: 2px;
+  gap: 2px;
+  background: var(--bg-7);
+  border: 1px solid var(--border-4);
+  border-radius: 9px;
+}
+
+.pill {
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: transparent;
+  color: var(--text-dim);
+  transition: all 0.15s ease;
+}
+.pill:hover {
+  color: var(--text-tertiary);
+}
+
+.active {
+  background: var(--teal);
+  color: var(--teal-text);
+}
+.active:hover {
+  color: var(--teal-text);
+}

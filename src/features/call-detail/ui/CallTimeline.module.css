@@ -1,0 +1,106 @@
+.timeline {
+  display: flex;
+  flex-direction: column;
+}
+
+.entry {
+  display: grid;
+  grid-template-columns: 58px 18px 1fr;
+  gap: 12px;
+  cursor: pointer;
+  padding: 2px 0;
+}
+
+.ts {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-dimmest);
+  padding-top: 12px;
+  transition: color 0.15s ease;
+}
+.tsActive {
+  color: var(--teal-pale);
+}
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.railLine {
+  width: 1px;
+  flex: 1;
+  background: var(--border-2);
+  transition: background 0.15s ease;
+}
+.railActive {
+  background: #2c4a49;
+}
+
+.node {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--border-6);
+  border: 2px solid var(--bg-2);
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+.nodeActive {
+  background: var(--teal-light);
+  border-color: var(--teal-bg);
+}
+
+.card {
+  padding: 8px 12px;
+  margin: 2px 0;
+  border-radius: 10px;
+  background: #1d1c1a;
+  border: 1px solid var(--border-1);
+  transition: all 0.15s ease;
+}
+.cardActive {
+  background: #1e2726;
+  border-color: #2c4a49;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.speaker {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  transition: color 0.15s ease;
+}
+.speakerFlag {
+  color: var(--urgent);
+}
+.speakerActive {
+  color: var(--teal-pale);
+}
+
+.flagBadge {
+  padding: 1px 6px;
+  border-radius: 5px;
+  font-size: 10px;
+  background: var(--urgent-bg);
+  color: var(--urgent);
+  border: 1px solid var(--urgent-border);
+}
+
+.text {
+  margin-top: 5px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-tertiary);
+  text-wrap: pretty;
+  transition: color 0.15s ease;
+}
+.textActive {
+  color: var(--text-primary);
+}

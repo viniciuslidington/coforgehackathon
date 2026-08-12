@@ -1,0 +1,32 @@
+.badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 10.5px;
+}
+
+.diamond {
+  width: 5px;
+  height: 5px;
+  transform: rotate(45deg);
+}
+
+.urgent {
+  background: var(--urgent-bg);
+  color: var(--urgent);
+  border: 1px solid var(--urgent-border);
+}
+.urgent .diamond {
+  background: var(--urgent);
+}
+
+.teal {
+  background: var(--teal-bg);
+  color: var(--teal-pale);
+  border: 1px solid var(--teal-border);
+}
+.teal .diamond {
+  background: var(--teal-pale);
+}

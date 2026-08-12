@@ -1,0 +1,110 @@
+.sidebar {
+  width: 68px;
+  flex: 0 0 68px;
+  background: var(--bg-1);
+  border-right: 1px solid var(--border-2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 0 16px;
+  gap: 26px;
+}
+
+.logo {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--teal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--teal-glow);
+  letter-spacing: -0.02em;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  width: 100%;
+}
+
+.navItem {
+  width: 40px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.12s ease;
+}
+.navItem:hover {
+  background: var(--bg-4);
+}
+
+.navItem[data-active='true'] {
+  background: var(--bg-8);
+  border-left: 2px solid var(--teal-light);
+}
+
+/* Icon: Briefing (hamburger) */
+.iconBriefing {
+  width: 14px;
+  height: 2px;
+  background: var(--text-primary);
+  box-shadow: 0 5px 0 var(--text-primary), 0 -5px 0 var(--text-dimmer);
+}
+
+/* Icon: Hoot (circle) */
+.iconHoot {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--text-dimmer);
+  border-radius: 50%;
+}
+
+/* Icon: Counterparties (square) */
+.iconCounterparties {
+  width: 13px;
+  height: 13px;
+  border: 2px solid var(--text-dimmer);
+}
+
+/* Icon: Flags (diamond) */
+.iconFlags {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--text-dimmer);
+  transform: rotate(45deg);
+}
+
+.flagDot {
+  position: absolute;
+  top: 7px;
+  right: 9px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--urgent);
+  border: 2px solid var(--bg-1);
+}
+
+.avatar {
+  margin-top: auto;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #2c2a27;
+  border: 1px solid var(--border-6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-tertiary);
+}

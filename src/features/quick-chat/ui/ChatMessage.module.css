@@ -1,0 +1,49 @@
+.bubble {
+  border-radius: 12px;
+}
+
+.user {
+  align-self: flex-end;
+  max-width: 86%;
+  padding: 9px 12px;
+  background: var(--bg-9);
+  border: 1px solid #322f2b;
+}
+
+.ai {
+  align-self: stretch;
+  max-width: 100%;
+  padding: 12px 14px;
+  background: var(--bg-5);
+  border: 1px solid var(--border-3);
+}
+
+.tag {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+}
+
+.user .tag {
+  color: var(--text-dimmer);
+}
+
+.ai .tag {
+  color: var(--teal-light);
+}
+
+.text {
+  margin-top: 6px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  text-wrap: pretty;
+}
+
+.user .text {
+  color: var(--text-primary);
+}
+
+.ai .text {
+  color: var(--text-secondary);
+}

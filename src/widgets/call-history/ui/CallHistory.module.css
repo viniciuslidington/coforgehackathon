@@ -1,0 +1,81 @@
+.panel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-3);
+  border-radius: 14px;
+  background: var(--bg-2);
+  overflow: hidden;
+}
+
+.toolbar {
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border-1);
+}
+
+.titleGroup {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.title {
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dimmer);
+}
+
+.controls {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.colHeaders {
+  display: grid;
+  grid-template-columns: 70px 108px minmax(180px, 1fr) 66px 108px;
+  gap: 12px;
+  padding: 9px 26px 9px 16px;
+  border-left: 2px solid transparent;
+  border-bottom: 1px solid var(--border-1);
+  background: var(--bg-0);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--text-dimmest);
+}
+
+.mentionHeader {
+  text-align: center;
+}
+
+.rows {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Custom scrollbar */
+.rows::-webkit-scrollbar {
+  width: 10px;
+}
+.rows::-webkit-scrollbar-thumb {
+  background: var(--border-6);
+  border-radius: 10px;
+  border: 3px solid var(--bg-0);
+}
+.rows::-webkit-scrollbar-track {
+  background: transparent;
+}
