@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from datetime import date, timedelta
 import os
+import logging
 from typing import Literal
 from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,8 +12,21 @@ from pydantic import BaseModel, Field
 
 from app.database import initialize_database, list_summaries, summary_exists, summary_has_keywords, upsert_summary
 from app.graph import Mode, generate_meeting_overview, run_meeting_agent
-from app.meetings import MEETINGS, get_meeting, load_meeting_transcript, meeting_participants
+from app.meetings import MEETINGS, get_meeting, load_meeting_transcript, meeting_duration_seconds, meeting_participants
 from app.vtt import parse_vtt, transcript_from_captions
+
+logger = logging.getLogger("meeting-insights")
+
+def openrouter_failure(exc: APIStatusError) -> str:
+    provider_body = getattr(exc, "body", None)
+    suffix = f" Provider response: {provider_body}" if provider_body else ""
+    return f"OpenRouter request failed ({exc.status_code}): {exc.message}.{suffix}"
+
+def raise_openrouter_failure(exc: APIStatusError) -> None:
+    # Preserve upstream throttling so clients can retry instead of treating a
+    # shared free-pool limit as an internal gateway failure.
+    status_code = 429 if exc.status_code == 429 else 502
+    raise HTTPException(status_code=status_code, detail=openrouter_failure(exc)) from exc
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -46,6 +60,7 @@ class StoredMeetingSummary(BaseModel):
     participants: list[str]
     simple_summary: str
     keywords: list[str]
+    duration_seconds: int
     refreshed_at: str
 
 class SummaryPage(BaseModel):
@@ -78,17 +93,36 @@ def execute_agent(transcript: str, mode: Mode, focus_points: str | None, questio
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except APIStatusError as exc:
-        # Do not leak upstream SDK stack traces to API clients; keep the actual
-        # provider message, which is actionable for invalid keys/credit limits.
-        raise HTTPException(status_code=502, detail=f"OpenRouter request failed: {exc.message}") from exc
+        # Do not leak upstream SDK stack traces; preserve the actionable
+        # provider message and throttling status for clients.
+        logger.error(
+            "OpenRouter agent request failed status=%s message=%s body=%r",
+            exc.status_code,
+            exc.message,
+            getattr(exc, "body", None),
+        )
+        raise_openrouter_failure(exc)
 
-def execute_overview(transcript: str) -> tuple[str, str]:
+def execute_overview(transcript: str) -> tuple[str, str, list[str]]:
     try:
-        return generate_meeting_overview(transcript)
+        result = generate_meeting_overview(transcript)
+        logger.info(
+            "AI overview returned title=%r summary=%r keywords=%s",
+            result[0],
+            result[1],
+            result[2],
+        )
+        return result
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except APIStatusError as exc:
-        raise HTTPException(status_code=502, detail=f"OpenRouter request failed: {exc.message}") from exc
+        logger.error(
+            "OpenRouter overview request failed status=%s message=%s body=%r",
+            exc.status_code,
+            exc.message,
+            getattr(exc, "body", None),
+        )
+        raise_openrouter_failure(exc)
 
 @app.get("/health")
 def health() -> dict[str, str]:
@@ -104,15 +138,47 @@ def refresh_meetings() -> RefreshResponse:
     """Store only built-in meetings that have not already been processed."""
     processed = 0
     skipped = 0
+    total = len(MEETINGS)
+    logger.info("Starting meeting sync: total_available=%d", total)
     for meeting in MEETINGS.values():
         if summary_exists(meeting.id) and summary_has_keywords(meeting.id):
             skipped += 1
+            logger.info(
+                "Skipping meeting %s (%d/%d): summary already has keywords and duration",
+                meeting.id,
+                processed + skipped,
+                total,
+            )
             continue
+        logger.info(
+            "Processing meeting %s (%d/%d): processed=%d skipped=%d",
+            meeting.id,
+            processed + skipped + 1,
+            total,
+            processed,
+            skipped,
+        )
         transcript, _ = load_meeting_transcript(meeting)
         title, simple_summary, keywords = execute_overview(transcript)
-        upsert_summary(meeting_id=meeting.id, title=title, meeting_date=meeting.meeting_date, participants=meeting_participants(meeting), simple_summary=simple_summary, keywords=keywords)
+        participants = meeting_participants(meeting)
+        duration = meeting_duration_seconds(meeting)
+        upsert_summary(meeting_id=meeting.id, title=title, meeting_date=meeting.meeting_date, participants=participants, simple_summary=simple_summary, keywords=keywords, duration_seconds=duration)
         processed += 1
+        logger.info(
+            "Stored meeting %s: title=%r participants=%s duration_seconds=%d keywords=%s",
+            meeting.id,
+            title,
+            participants,
+            duration,
+            keywords,
+        )
     page = get_stored_summaries(page=1, page_size=20)
+    logger.info(
+        "Meeting sync complete: processed=%d skipped=%d total_stored=%d",
+        processed,
+        skipped,
+        page.total,
+    )
     return RefreshResponse(processed=processed, skipped=skipped, total_stored=page.total, items=page.items)
 
 def get_stored_summaries(page: int, page_size: int, period: Literal["day", "week", "30d", "all"] = "all") -> SummaryPage:

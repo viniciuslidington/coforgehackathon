@@ -7,6 +7,7 @@ export interface MeetingSummary {
   participants: string[];
   simple_summary: string;
   keywords: string[];
+  duration_seconds: number;
   refreshed_at: string;
 }
 

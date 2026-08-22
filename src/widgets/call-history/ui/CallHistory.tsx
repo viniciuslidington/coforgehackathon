@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { MeetingPeriod, MeetingSummaryPage } from '@/entities/meeting/model/types';
-import { getMeetingSummaries } from '@/shared/api/meetings';
+import { getMeetingSummaries, syncMeetings } from '@/shared/api/meetings';
 import { CallRow } from '@/entities/call/ui/CallRow';
 import styles from './CallHistory.module.css';
 
@@ -21,6 +21,7 @@ export function CallHistory() {
   const [data, setData] = useState<MeetingSummaryPage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -58,6 +59,26 @@ export function CallHistory() {
     setPage(1);
   };
 
+  const handleSync = async () => {
+    if (loading || syncing) return;
+    setSyncing(true);
+    setError(null);
+    try {
+      await syncMeetings();
+      setLoading(true);
+      setPage(1);
+      // Changing the page alone does not retrigger the request when already
+      // on page one, so reload the current result explicitly after syncing.
+      const refreshed = await getMeetingSummaries(period, 1, pageSize);
+      setData(refreshed);
+    } catch (syncError: unknown) {
+      setError(syncError instanceof Error ? syncError.message : 'Could not sync meetings.');
+    } finally {
+      setSyncing(false);
+      setLoading(false);
+    }
+  };
+
   return (
     <section className={styles.panel} aria-label="Meeting summaries">
       <div className={styles.toolbar}>
@@ -66,6 +87,9 @@ export function CallHistory() {
           <div className={styles.count}>{loading ? 'Loading…' : `${total} meetings`}</div>
         </div>
         <div className={styles.controls}>
+          <button className={styles.syncButton} onClick={handleSync} disabled={syncing}>
+            {syncing ? 'Syncing…' : 'Get more meetings'}
+          </button>
           <div className={styles.periods} aria-label="Date range">
             {PERIODS.map(({ label, value }) => (
               <button key={value} className={`${styles.period} ${period === value ? styles.active : ''}`} onClick={() => selectPeriod(value)}>
@@ -84,7 +108,9 @@ export function CallHistory() {
 
       <div className={styles.colHeaders}>
         <div>DATE</div>
+        <div>DURATION</div>
         <div>MEETING</div>
+        <div>PARTICIPANTS</div>
         <div>AI SUMMARY</div>
         <div>KEYWORDS</div>
       </div>

@@ -10,18 +10,22 @@ interface CallRowProps {
 export function CallRow({ meeting }: CallRowProps) {
   const date = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
     .format(new Date(`${meeting.meeting_date}T00:00:00`));
+  const duration = `${Math.floor(meeting.duration_seconds / 60)}m ${meeting.duration_seconds % 60}s`;
 
   return (
     <article className={styles.row}>
       <div>
         <div className={styles.time}>{date}</div>
-        <div className={styles.duration}>{meeting.meeting_id}</div>
       </div>
+
+      <div className={styles.duration}>{duration}</div>
 
       <div>
         <div className={styles.counterparty}>{meeting.title}</div>
         <div className={styles.channel}>{meeting.participants.join(', ') || 'No participants'}</div>
       </div>
+
+      <div className={styles.participants}>{meeting.participants.join(', ') || 'No participants'}</div>
 
       <div className={styles.summaryCol}>
         <div className={styles.summaryText}>{meeting.simple_summary}</div>

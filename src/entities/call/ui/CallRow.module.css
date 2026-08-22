@@ -1,6 +1,6 @@
 .row {
   display: grid;
-  grid-template-columns: 110px minmax(150px, 0.75fr) minmax(220px, 1.4fr) minmax(180px, 0.9fr);
+  grid-template-columns: 110px 70px minmax(150px, 0.75fr) minmax(130px, 0.8fr) minmax(220px, 1.4fr) minmax(180px, 0.9fr);
   gap: 12px;
   padding: 13px 16px;
   border-bottom: 1px solid var(--border-0);
@@ -35,6 +35,13 @@
   font-size: 10.5px;
   color: var(--text-dimmest);
   margin-top: 3px;
+}
+
+.participants {
+  min-width: 0;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .summaryCol {

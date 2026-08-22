@@ -2,6 +2,13 @@ import type { MeetingPeriod, MeetingSummaryPage } from '@/entities/meeting/model
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_MEETING_API_URL ?? 'http://localhost:8000';
 
+export async function syncMeetings(): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/sync-meetings`, { method: 'POST' });
+  if (!response.ok) {
+    throw new Error(`Could not sync meetings (${response.status}).`);
+  }
+}
+
 export async function getMeetingSummaries(
   period: MeetingPeriod,
   page: number,

@@ -30,7 +30,7 @@ def _model() -> ChatOpenAI:
     if not api_key:
         raise RuntimeError("OPENROUTER_API_KEY is not configured. Add it to .env before calling the API.")
     return ChatOpenAI(
-        model=os.getenv("OPENROUTER_MODEL", "openai/gpt-4.1-mini"),
+        model=os.getenv("OPENROUTER_MODEL"),
         api_key=api_key,
         base_url="https://openrouter.ai/api/v1",
         temperature=0,

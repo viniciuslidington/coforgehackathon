@@ -18,6 +18,7 @@ SCHEMA = """
         participants TEXT NOT NULL,
         simple_summary TEXT NOT NULL,
         keywords TEXT NOT NULL DEFAULT '',
+        duration_seconds INTEGER NOT NULL DEFAULT 0,
         refreshed_at TEXT NOT NULL
     )
 """
@@ -33,6 +34,8 @@ def connection() -> Iterator[sqlite3.Connection]:
         columns = {row["name"] for row in conn.execute("PRAGMA table_info(meeting_summaries)")}
         if "keywords" not in columns:
             conn.execute("ALTER TABLE meeting_summaries ADD COLUMN keywords TEXT NOT NULL DEFAULT ''")
+        if "duration_seconds" not in columns:
+            conn.execute("ALTER TABLE meeting_summaries ADD COLUMN duration_seconds INTEGER NOT NULL DEFAULT 0")
         yield conn
         conn.commit()
     finally:
@@ -42,19 +45,20 @@ def initialize_database() -> None:
     with connection() as conn:
         pass
 
-def upsert_summary(*, meeting_id: str, title: str, meeting_date: str, participants: list[str], simple_summary: str, keywords: list[str]) -> None:
+def upsert_summary(*, meeting_id: str, title: str, meeting_date: str, participants: list[str], simple_summary: str, keywords: list[str], duration_seconds: int) -> None:
     with connection() as conn:
         conn.execute("""
-            INSERT INTO meeting_summaries (meeting_id, title, meeting_date, participants, simple_summary, keywords, refreshed_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO meeting_summaries (meeting_id, title, meeting_date, participants, simple_summary, keywords, duration_seconds, refreshed_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(meeting_id) DO UPDATE SET
                 title=excluded.title,
                 meeting_date=excluded.meeting_date,
                 participants=excluded.participants,
                 simple_summary=excluded.simple_summary,
                 keywords=excluded.keywords,
+                duration_seconds=excluded.duration_seconds,
                 refreshed_at=excluded.refreshed_at
-        """, (meeting_id, title, meeting_date, ", ".join(participants), simple_summary, ", ".join(keywords), datetime.now(UTC).isoformat()))
+        """, (meeting_id, title, meeting_date, ", ".join(participants), simple_summary, ", ".join(keywords), duration_seconds, datetime.now(UTC).isoformat()))
 
 def summary_exists(meeting_id: str) -> bool:
     with connection() as conn:
@@ -62,8 +66,8 @@ def summary_exists(meeting_id: str) -> bool:
 
 def summary_has_keywords(meeting_id: str) -> bool:
     with connection() as conn:
-        row = conn.execute("SELECT keywords FROM meeting_summaries WHERE meeting_id = ?", (meeting_id,)).fetchone()
-    return bool(row and row["keywords"].strip())
+        row = conn.execute("SELECT keywords, duration_seconds FROM meeting_summaries WHERE meeting_id = ?", (meeting_id,)).fetchone()
+    return bool(row and row["keywords"].strip() and row["duration_seconds"] > 0)
 
 def list_summaries(*, offset: int, limit: int, date_from: str | None = None) -> tuple[list[dict[str, str]], int]:
     with connection() as conn:
@@ -71,7 +75,7 @@ def list_summaries(*, offset: int, limit: int, date_from: str | None = None) -> 
         parameters: tuple[object, ...] = (date_from,) if date_from else ()
         total = conn.execute(f"SELECT COUNT(*) FROM meeting_summaries {where}", parameters).fetchone()[0]
         rows = conn.execute("""
-            SELECT meeting_id, title, meeting_date, participants, simple_summary, keywords, refreshed_at
+            SELECT meeting_id, title, meeting_date, participants, simple_summary, keywords, duration_seconds, refreshed_at
             FROM meeting_summaries {where} ORDER BY meeting_date DESC, refreshed_at DESC LIMIT ? OFFSET ?
         """.format(where=where), (*parameters, limit, offset)).fetchall()
     return [dict(row) for row in rows], total
