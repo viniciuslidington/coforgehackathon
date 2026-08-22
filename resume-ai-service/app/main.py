@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from datetime import date, timedelta
+import os
+from typing import Literal
 from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from openai import APIStatusError
 from pydantic import BaseModel, Field
 
-from app.database import initialize_database, list_summaries, summary_exists, upsert_summary
+from app.database import initialize_database, list_summaries, summary_exists, summary_has_keywords, upsert_summary
 from app.graph import Mode, generate_meeting_overview, run_meeting_agent
 from app.meetings import MEETINGS, get_meeting, load_meeting_transcript, meeting_participants
 from app.vtt import parse_vtt, transcript_from_captions
@@ -16,6 +20,12 @@ async def lifespan(_: FastAPI):
     yield
 
 app = FastAPI(title="Meeting Insights API", description="LangGraph-powered summaries and Q&A for WebVTT meeting transcripts.", version="0.1.0", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[origin.strip() for origin in os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class MeetingResponse(BaseModel):
     result: str
@@ -35,6 +45,7 @@ class StoredMeetingSummary(BaseModel):
     meeting_date: str
     participants: list[str]
     simple_summary: str
+    keywords: list[str]
     refreshed_at: str
 
 class SummaryPage(BaseModel):
@@ -94,29 +105,36 @@ def refresh_meetings() -> RefreshResponse:
     processed = 0
     skipped = 0
     for meeting in MEETINGS.values():
-        if summary_exists(meeting.id):
+        if summary_exists(meeting.id) and summary_has_keywords(meeting.id):
             skipped += 1
             continue
         transcript, _ = load_meeting_transcript(meeting)
-        title, simple_summary = execute_overview(transcript)
-        upsert_summary(meeting_id=meeting.id, title=title, meeting_date=meeting.meeting_date, participants=meeting_participants(meeting), simple_summary=simple_summary)
+        title, simple_summary, keywords = execute_overview(transcript)
+        upsert_summary(meeting_id=meeting.id, title=title, meeting_date=meeting.meeting_date, participants=meeting_participants(meeting), simple_summary=simple_summary, keywords=keywords)
         processed += 1
     page = get_stored_summaries(page=1, page_size=20)
     return RefreshResponse(processed=processed, skipped=skipped, total_stored=page.total, items=page.items)
 
-def get_stored_summaries(page: int, page_size: int) -> SummaryPage:
-    rows, total = list_summaries(offset=(page - 1) * page_size, limit=page_size)
+def get_stored_summaries(page: int, page_size: int, period: Literal["day", "week", "30d", "all"] = "all") -> SummaryPage:
+    date_from = {
+        "day": date.today().isoformat(),
+        "week": (date.today() - timedelta(days=6)).isoformat(),
+        "30d": (date.today() - timedelta(days=29)).isoformat(),
+        "all": None,
+    }[period]
+    rows, total = list_summaries(offset=(page - 1) * page_size, limit=page_size, date_from=date_from)
     items = []
     for row in rows:
         data = dict(row)
         data["participants"] = [name.strip() for name in data["participants"].split(",") if name.strip()]
+        data["keywords"] = [keyword.strip() for keyword in data["keywords"].split(",") if keyword.strip()]
         items.append(StoredMeetingSummary(**data))
     return SummaryPage(items=items, total=total, page=page, page_size=page_size)
 
 @app.get("/meeting-summaries", response_model=SummaryPage)
-def get_meeting_summaries(page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=100)) -> SummaryPage:
-    """Return the persisted meeting overview table, with pagination."""
-    return get_stored_summaries(page, page_size)
+def get_meeting_summaries(page: int = Query(1, ge=1), page_size: int = Query(15, ge=1, le=100), period: Literal["day", "week", "30d", "all"] = "all") -> SummaryPage:
+    """Return persisted meeting overviews, filtered by meeting date and paginated."""
+    return get_stored_summaries(page, page_size, period)
 
 def find_sample_meeting(meeting_id: str):
     meeting = get_meeting(meeting_id)

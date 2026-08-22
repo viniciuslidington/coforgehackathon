@@ -1,23 +1,14 @@
 .row {
   display: grid;
-  grid-template-columns: 70px 108px minmax(180px, 1fr) 66px 108px;
+  grid-template-columns: 110px minmax(150px, 0.75fr) minmax(220px, 1.4fr) minmax(180px, 0.9fr);
   gap: 12px;
   padding: 13px 16px;
   border-bottom: 1px solid var(--border-0);
-  cursor: pointer;
   background: transparent;
   border-left: 2px solid transparent;
   transition: background 0.12s ease;
 }
 .row:hover {
-  background: var(--bg-6);
-}
-
-.urgent {
-  background: var(--bg-urgent-row);
-  border-left-color: var(--urgent);
-}
-.urgent:hover {
   background: var(--bg-6);
 }
 
@@ -68,33 +59,24 @@
   flex-wrap: wrap;
 }
 
-.mentionsCol {
+.keywords {
   display: flex;
-  justify-content: center;
-  align-items: flex-start;
+  align-content: flex-start;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
-.mentionsBadge {
-  min-width: 30px;
-  text-align: center;
+.keyword, .emptyKeyword {
   padding: 3px 7px;
+  border: 1px solid var(--border-4);
   border-radius: 7px;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 10.5px;
+  color: var(--teal-pale);
+  background: var(--teal-bg);
 }
 
-.mentionsBadge[data-level='high'] {
-  background: var(--urgent-bg);
-  color: var(--urgent);
-  border: 1px solid var(--urgent-border);
-}
-.mentionsBadge[data-level='some'] {
-  background: #22201d;
-  color: var(--text-tertiary);
-  border: 1px solid var(--border-3);
-}
-.mentionsBadge[data-level='none'] {
+.emptyKeyword {
+  color: var(--text-dimmest);
   background: transparent;
-  color: var(--text-ghost);
-  border: 1px solid var(--border-3);
 }
