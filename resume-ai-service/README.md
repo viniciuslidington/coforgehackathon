@@ -20,8 +20,8 @@ Open `http://127.0.0.1:8000/docs` for interactive API documentation.
 # Process and persist only new sample meetings (calls OpenRouter once per new meeting)
 curl -X POST http://127.0.0.1:8000/sync-meetings
 
-# Read persisted summary rows, with pagination
-curl 'http://127.0.0.1:8000/meeting-summaries?page=1&page_size=20'
+# Read persisted summary rows, filtered by date range and paginated
+curl 'http://127.0.0.1:8000/meeting-summaries?period=30d&page=1&page_size=15'
 
 # Discover the built-in sample meetings and IDs
 curl http://127.0.0.1:8000/meetings
@@ -51,4 +51,4 @@ The parser preserves timestamps in the model context, and the Q&A agent is promp
 
 ## Stored meeting overview
 
-`POST /sync-meetings` processes only built-in meetings without a SQLite row, so repeated calls do not spend model credits regenerating existing summaries. Its response includes `processed`, `skipped`, and `total_stored` counts. Each stored row contains a generated title, simple summary, speaker-derived participants, catalog date, and refresh timestamp. Use `GET /meeting-summaries` to power a meeting table in a client.
+`POST /sync-meetings` processes built-in meetings that are new or predate keyword support, so repeated calls do not spend model credits regenerating complete rows. Its response includes `processed`, `skipped`, and `total_stored` counts. Each stored row contains a generated title, simple summary, important transcript-grounded keywords, speaker-derived participants, catalog date, and refresh timestamp. Use `GET /meeting-summaries` to power a meeting table in a client. It accepts `period=day`, `week`, `30d`, or `all` and defaults to 15 rows per page.

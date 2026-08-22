@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from app.vtt import parse_vtt, transcript_from_captions
+from app.vtt import duration_seconds, parse_vtt, transcript_from_captions
 
 SAMPLES_DIR = Path(__file__).resolve().parent.parent / "samples"
 
@@ -50,3 +50,7 @@ def meeting_participants(meeting: Meeting) -> list[str]:
         if separator and name and name not in names:
             names.append(name)
     return names
+
+def meeting_duration_seconds(meeting: Meeting) -> int:
+    captions = parse_vtt((SAMPLES_DIR / meeting.filename).read_text(encoding="utf-8"))
+    return duration_seconds(captions)

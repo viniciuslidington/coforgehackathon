@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "api": "cd resume-ai-service && env -u VIRTUAL_ENV uv sync && .venv/bin/python -m uvicorn app.main:app --reload",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"

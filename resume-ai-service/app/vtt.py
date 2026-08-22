@@ -12,6 +12,11 @@ class Caption:
     end: str
     text: str
 
+def timestamp_seconds(timestamp: str) -> float:
+    hours, minutes, seconds = timestamp.split(":")
+    whole_seconds, milliseconds = seconds.split(".")
+    return int(hours) * 3600 + int(minutes) * 60 + int(whole_seconds) + int(milliseconds) / 1000
+
 def parse_vtt(raw_vtt: str) -> list[Caption]:
     """Extract time-stamped spoken captions, rejecting malformed uploads."""
     normalized = raw_vtt.lstrip("\ufeff").replace("\r\n", "\n").replace("\r", "\n")
@@ -35,3 +40,7 @@ def parse_vtt(raw_vtt: str) -> list[Caption]:
 
 def transcript_from_captions(captions: list[Caption]) -> str:
     return "\n".join(f"[{cue.start}–{cue.end}] {cue.text}" for cue in captions)
+
+def duration_seconds(captions: list[Caption]) -> int:
+    """Return the elapsed duration from the first cue start to the last cue end."""
+    return max(0, round(timestamp_seconds(captions[-1].end) - timestamp_seconds(captions[0].start)))
