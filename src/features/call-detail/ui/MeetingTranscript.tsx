@@ -1,15 +1,15 @@
 'use client';
 
-import type { CallSegment } from '@/entities/call/model/types';
+import type { MeetingSegment } from '@/entities/meeting/model/types';
 import styles from './CallTranscript.module.css';
 
-interface CallTranscriptProps {
-  segments: CallSegment[];
+interface MeetingTranscriptProps {
+  segments: MeetingSegment[];
   isInRange: (index: number) => boolean;
   onPick: (index: number) => void;
 }
 
-export function CallTranscript({ segments, isInRange, onPick }: CallTranscriptProps) {
+export function MeetingTranscript({ segments, isInRange, onPick }: MeetingTranscriptProps) {
   return (
     <div className={styles.transcript}>
       {segments.map((seg, i) => {

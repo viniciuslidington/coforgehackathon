@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import type { MeetingPeriod, MeetingSummaryPage } from '@/entities/meeting/model/types';
 import { getMeetingSummaries, syncMeetings } from '@/shared/api/meetings';
 import { CallRow } from '@/entities/call/ui/CallRow';
+import { useMeetingDetail } from '@/features/call-detail/model/useMeetingDetail';
+import { MeetingDetailModal } from '@/features/call-detail/ui/MeetingDetailModal';
 import styles from './CallHistory.module.css';
 
 const PERIODS: { label: string; value: MeetingPeriod }[] = [
@@ -22,6 +24,7 @@ export function CallHistory() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const meetingDetail = useMeetingDetail();
 
   useEffect(() => {
     const controller = new AbortController();
@@ -118,7 +121,9 @@ export function CallHistory() {
       <div className={styles.rows} aria-live="polite">
         {error && <p className={styles.message}>{error} Check that the Meeting Insights API is running.</p>}
         {!error && !loading && data?.items.length === 0 && <p className={styles.message}>No meetings found for this date range.</p>}
-        {data?.items.map((meeting) => <CallRow key={meeting.meeting_id} meeting={meeting} />)}
+        {data?.items.map((meeting) => (
+          <CallRow key={meeting.meeting_id} meeting={meeting} onOpen={meetingDetail.openMeeting} />
+        ))}
       </div>
 
       <div className={styles.pagination}>
@@ -128,6 +133,24 @@ export function CallHistory() {
           <button disabled={page >= totalPages || loading} onClick={() => { setLoading(true); setError(null); setPage((current) => current + 1); }}>Next</button>
         </div>
       </div>
+
+      {meetingDetail.selectedMeeting && (
+        <MeetingDetailModal
+          meeting={meetingDetail.selectedMeeting}
+          segments={meetingDetail.segments}
+          segmentsLoading={meetingDetail.segmentsLoading}
+          segmentsError={meetingDetail.segmentsError}
+          messages={meetingDetail.messages}
+          draft={meetingDetail.draft}
+          rangeText={meetingDetail.rangeText}
+          isInRange={meetingDetail.isInRange}
+          onPickSegment={meetingDetail.pickSegment}
+          onClose={meetingDetail.closeMeeting}
+          onDraftChange={meetingDetail.setDraft}
+          onSend={meetingDetail.sendMessage}
+          onClearRange={meetingDetail.clearRange}
+        />
+      )}
     </section>
   );
 }

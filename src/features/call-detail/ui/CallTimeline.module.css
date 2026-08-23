@@ -1,106 +1,192 @@
 .timeline {
   display: flex;
   flex-direction: column;
+  position: relative;
+  width: 100%;
+}
+
+.empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 13px;
+  background: var(--bg-2);
+  border: 1px dashed var(--border-4);
+  border-radius: 12px;
 }
 
 .entry {
   display: grid;
-  grid-template-columns: 58px 18px 1fr;
+  grid-template-columns: 62px 20px 1fr;
   gap: 12px;
   cursor: pointer;
-  padding: 2px 0;
+  padding: 3px 0;
+  position: relative;
+  outline: none;
+  transition: transform 0.15s ease;
 }
 
+.entry:focus-visible .card {
+  outline: 2px solid var(--teal-light);
+  outline-offset: 2px;
+}
+
+/* ── Timestamp ─────────────────────────────────────────────────── */
 .ts {
   font-family: var(--font-mono);
   font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
   color: var(--text-dimmest);
-  padding-top: 12px;
-  transition: color 0.15s ease;
-}
-.tsActive {
-  color: var(--teal-pale);
+  padding-top: 10px;
+  text-align: right;
+  white-space: nowrap;
+  user-select: none;
+  transition: color 0.15s ease, opacity 0.15s ease;
 }
 
+.entry:hover .ts {
+  color: var(--text-tertiary);
+}
+
+.tsActive {
+  color: var(--teal-pale) !important;
+  font-weight: 500;
+}
+
+/* ── Rail & Connector Nodes ─────────────────────────────────────── */
 .rail {
   display: flex;
   flex-direction: column;
   align-items: center;
+  position: relative;
 }
 
 .railLine {
-  width: 1px;
+  width: 2px;
   flex: 1;
   background: var(--border-2);
-  transition: background 0.15s ease;
+  transition: background 0.2s ease;
 }
+
+.railHidden {
+  opacity: 0;
+  visibility: hidden;
+}
+
 .railActive {
-  background: #2c4a49;
+  background: var(--teal-border-l);
 }
 
 .node {
-  width: 9px;
-  height: 9px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background: var(--border-6);
-  border: 2px solid var(--bg-2);
+  border: 2px solid var(--bg-0);
   flex-shrink: 0;
-  transition: all 0.15s ease;
-}
-.nodeActive {
-  background: var(--teal-light);
-  border-color: var(--teal-bg);
+  margin: 10px 0;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+.entry:hover .node {
+  background: var(--teal-pale);
+  transform: scale(1.15);
+}
+
+.nodeActive {
+  background: var(--teal-light) !important;
+  border-color: var(--bg-0) !important;
+  box-shadow: 0 0 0 3px rgba(63, 182, 186, 0.28), 0 0 10px rgba(63, 182, 186, 0.4);
+  transform: scale(1.2);
+}
+
+/* ── Content Card ─────────────────────────────────────────────── */
 .card {
-  padding: 8px 12px;
+  padding: 10px 14px;
   margin: 2px 0;
   border-radius: 10px;
-  background: #1d1c1a;
-  border: 1px solid var(--border-1);
-  transition: all 0.15s ease;
+  background: var(--bg-3);
+  border: 1px solid var(--border-2);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
+
+.entry:hover .card {
+  background: var(--bg-4);
+  border-color: var(--border-5);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22);
+}
+
 .cardActive {
-  background: #1e2726;
-  border-color: #2c4a49;
+  background: var(--teal-bg) !important;
+  border-color: var(--teal-border-l) !important;
+  box-shadow: 0 0 0 1px rgba(63, 182, 186, 0.18), 0 4px 16px rgba(0, 0, 0, 0.3) !important;
 }
 
 .cardHeader {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
-.speaker {
+.speakerBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 6px;
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--text-dim);
-  transition: color 0.15s ease;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  background: var(--bg-5);
+  border: 1px solid var(--border-3);
+  color: var(--text-secondary);
+  transition: all 0.15s ease;
 }
-.speakerFlag {
-  color: var(--urgent);
-}
-.speakerActive {
-  color: var(--teal-pale);
+
+.speakerAvatar {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  opacity: 0.9;
 }
 
 .flagBadge {
-  padding: 1px 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
   border-radius: 5px;
-  font-size: 10px;
+  font-size: 10.5px;
+  font-weight: 500;
   background: var(--urgent-bg);
   color: var(--urgent);
   border: 1px solid var(--urgent-border);
 }
 
+.flagDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--urgent);
+}
+
 .text {
-  margin-top: 5px;
+  margin-top: 6px;
   font-size: 13.5px;
-  line-height: 1.55;
+  line-height: 1.6;
   color: var(--text-tertiary);
   text-wrap: pretty;
   transition: color 0.15s ease;
 }
+
 .textActive {
   color: var(--text-primary);
 }

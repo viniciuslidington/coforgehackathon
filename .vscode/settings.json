@@ -1,0 +1,9 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/resume-ai-service/.venv/bin/python",
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/resume-ai-service/.venv/lib/python3.14/site-packages",
+    "${workspaceFolder}/resume-ai-service/.venv/lib/python3.13/site-packages",
+    "${workspaceFolder}/resume-ai-service/.venv/lib/python3.12/site-packages",
+    "${workspaceFolder}/resume-ai-service/.venv/lib/python3.11/site-packages"
+  ]
+}

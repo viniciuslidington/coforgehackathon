@@ -13,7 +13,10 @@ from pydantic import BaseModel, Field
 from app.database import initialize_database, list_summaries, summary_exists, summary_has_keywords, upsert_summary
 from app.graph import Mode, generate_meeting_overview, run_meeting_agent
 from app.meetings import MEETINGS, get_meeting, load_meeting_transcript, meeting_duration_seconds, meeting_participants
-from app.vtt import parse_vtt, transcript_from_captions
+from app.transcripts import FileTranscriptRepository, TranscriptRepository
+from app.vtt import Caption, format_timestamp, parse_vtt, timestamp_seconds, transcript_from_captions
+
+transcript_repository: TranscriptRepository = FileTranscriptRepository()
 
 logger = logging.getLogger("meeting-insights")
 
@@ -74,6 +77,11 @@ class RefreshResponse(BaseModel):
     skipped: int
     total_stored: int
     items: list[StoredMeetingSummary]
+
+class TranscriptSegment(BaseModel):
+    t: str
+    sp: str
+    tx: str
 
 async def read_transcript(vtt_file: UploadFile) -> tuple[str, int]:
     if not (vtt_file.filename or "").lower().endswith(".vtt"):
@@ -201,6 +209,21 @@ def get_stored_summaries(page: int, page_size: int, period: Literal["day", "week
 def get_meeting_summaries(page: int = Query(1, ge=1), page_size: int = Query(15, ge=1, le=100), period: Literal["day", "week", "30d", "all"] = "all") -> SummaryPage:
     """Return persisted meeting overviews, filtered by meeting date and paginated."""
     return get_stored_summaries(page, page_size, period)
+
+def caption_to_segment(caption: Caption) -> TranscriptSegment:
+    t = format_timestamp(timestamp_seconds(caption.start))
+    speaker, separator, rest = caption.text.partition(":")
+    if separator:
+        return TranscriptSegment(t=t, sp=speaker.strip(), tx=rest.strip())
+    return TranscriptSegment(t=t, sp="", tx=caption.text)
+
+@app.get("/meeting-summaries/{meeting_id}/transcript", response_model=list[TranscriptSegment])
+def get_meeting_transcript(meeting_id: str) -> list[TranscriptSegment]:
+    """Return timestamped, speaker-attributed segments for a stored meeting."""
+    captions = transcript_repository.get_captions(meeting_id)
+    if captions is None:
+        raise HTTPException(status_code=404, detail=f"No transcript found for meeting '{meeting_id}'.")
+    return [caption_to_segment(caption) for caption in captions]
 
 def find_sample_meeting(meeting_id: str):
     meeting = get_meeting(meeting_id)

@@ -19,7 +19,7 @@ class MeetingState(TypedDict, total=False):
     question: str
     result: str
 
-class OverviewState(TypedDict):
+class OverviewState(TypedDict, total=False):
     transcript: str
     title: str
     simple_summary: str

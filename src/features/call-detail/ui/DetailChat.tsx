@@ -1,6 +1,6 @@
 'use client';
 
-import type { ChatMessage } from '@/entities/call/model/types';
+import type { ChatMessage } from '@/entities/meeting/model/types';
 import { ChatMessageBubble } from '@/features/quick-chat/ui/ChatMessage';
 import styles from './DetailChat.module.css';
 
