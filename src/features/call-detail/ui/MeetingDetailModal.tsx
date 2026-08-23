@@ -14,13 +14,9 @@ interface MeetingDetailModalProps {
   segmentsError: string | null;
   messages: ChatMessage[];
   draft: string;
-  rangeText: string | null;
-  isInRange: (index: number) => boolean;
-  onPickSegment: (index: number) => void;
   onClose: () => void;
   onDraftChange: (value: string) => void;
   onSend: () => void;
-  onClearRange: () => void;
 }
 
 export function MeetingDetailModal({
@@ -30,13 +26,9 @@ export function MeetingDetailModal({
   segmentsError,
   messages,
   draft,
-  rangeText,
-  isInRange,
-  onPickSegment,
   onClose,
   onDraftChange,
   onSend,
-  onClearRange,
 }: MeetingDetailModalProps) {
   const [mode, setMode] = useState<'timeline' | 'transcript'>('timeline');
   const date = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
@@ -91,17 +83,9 @@ export function MeetingDetailModal({
               {segmentsError && <p className={styles.hint}>{segmentsError}</p>}
               {!segmentsLoading && !segmentsError && (
                 mode === 'timeline' ? (
-                  <MeetingTimeline
-                    segments={segments}
-                    isInRange={isInRange}
-                    onPick={onPickSegment}
-                  />
+                  <MeetingTimeline segments={segments} />
                 ) : (
-                  <MeetingTranscript
-                    segments={segments}
-                    isInRange={isInRange}
-                    onPick={onPickSegment}
-                  />
+                  <MeetingTranscript segments={segments} />
                 )
               )}
             </div>
@@ -111,10 +95,8 @@ export function MeetingDetailModal({
           <DetailChat
             messages={messages}
             draft={draft}
-            rangeText={rangeText}
             onDraftChange={onDraftChange}
             onSend={onSend}
-            onClearRange={onClearRange}
           />
         </div>
       </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { ChatMessage, MeetingSegment, MeetingSummary } from '@/entities/meeting/model/types';
 import { getMeetingTranscript } from '@/shared/api/meetings';
 
@@ -9,8 +9,6 @@ export function useMeetingDetail() {
   const [segments, setSegments] = useState<MeetingSegment[]>([]);
   const [segmentsLoading, setSegmentsLoading] = useState(false);
   const [segmentsError, setSegmentsError] = useState<string | null>(null);
-  const [rangeA, setRangeA] = useState<number | null>(null);
-  const [rangeB, setRangeB] = useState<number | null>(null);
   const [draft, setDraft] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
@@ -42,8 +40,6 @@ export function useMeetingDetail() {
     setSelectedMeeting(meeting);
     setSegments([]);
     setSegmentsError(null);
-    setRangeA(null);
-    setRangeB(null);
     setDraft('');
     setMessages([
       {
@@ -56,40 +52,6 @@ export function useMeetingDetail() {
   const closeMeeting = useCallback(() => {
     setSelectedMeeting(null);
   }, []);
-
-  const pickSegment = useCallback((index: number) => {
-    setRangeA(prev => {
-      if (prev === null || rangeB !== null) {
-        setRangeB(null);
-        return index;
-      }
-      const lo = Math.min(prev, index);
-      const hi = Math.max(prev, index);
-      setRangeA(lo);
-      setRangeB(hi);
-      return lo;
-    });
-  }, [rangeB]);
-
-  const clearRange = useCallback(() => {
-    setRangeA(null);
-    setRangeB(null);
-  }, []);
-
-  const isInRange = useCallback(
-    (index: number) => {
-      if (rangeA === null) return false;
-      if (rangeB === null) return index === rangeA;
-      return index >= rangeA && index <= rangeB;
-    },
-    [rangeA, rangeB],
-  );
-
-  const rangeText = useMemo(() => {
-    if (rangeA === null) return null;
-    if (rangeB === null) return segments[rangeA]?.t ?? null;
-    return `${segments[rangeA]?.t}–${segments[rangeB]?.t}`;
-  }, [segments, rangeA, rangeB]);
 
   const sendMessage = useCallback(() => {
     const q = draft.trim();
@@ -110,14 +72,8 @@ export function useMeetingDetail() {
     messages,
     draft,
     setDraft,
-    rangeA,
-    rangeB,
-    rangeText,
     openMeeting,
     closeMeeting,
-    pickSegment,
-    clearRange,
-    isInRange,
     sendMessage,
   } as const;
 }

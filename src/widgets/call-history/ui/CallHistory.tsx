@@ -142,13 +142,9 @@ export function CallHistory() {
           segmentsError={meetingDetail.segmentsError}
           messages={meetingDetail.messages}
           draft={meetingDetail.draft}
-          rangeText={meetingDetail.rangeText}
-          isInRange={meetingDetail.isInRange}
-          onPickSegment={meetingDetail.pickSegment}
           onClose={meetingDetail.closeMeeting}
           onDraftChange={meetingDetail.setDraft}
           onSend={meetingDetail.sendMessage}
-          onClearRange={meetingDetail.clearRange}
         />
       )}
     </section>

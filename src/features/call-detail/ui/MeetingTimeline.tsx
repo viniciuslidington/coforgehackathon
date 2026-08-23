@@ -5,8 +5,6 @@ import styles from './CallTimeline.module.css';
 
 interface MeetingTimelineProps {
   segments: MeetingSegment[];
-  isInRange: (index: number) => boolean;
-  onPick: (index: number) => void;
 }
 
 const SPEAKER_ACCENTS = [
@@ -28,7 +26,7 @@ function getSpeakerTheme(name: string) {
   return SPEAKER_ACCENTS[Math.abs(hash) % SPEAKER_ACCENTS.length];
 }
 
-export function MeetingTimeline({ segments, isInRange, onPick }: MeetingTimelineProps) {
+export function MeetingTimeline({ segments }: MeetingTimelineProps) {
   if (!segments || segments.length === 0) {
     return <div className={styles.empty}>No timeline segments recorded for this meeting.</div>;
   }
@@ -36,48 +34,27 @@ export function MeetingTimeline({ segments, isInRange, onPick }: MeetingTimeline
   return (
     <div className={styles.timeline} role="feed" aria-label="Meeting timeline">
       {segments.map((seg, i) => {
-        const active = isInRange(i);
         const speakerTheme = getSpeakerTheme(seg.sp);
         const speakerInitial = seg.sp ? seg.sp.charAt(0).toUpperCase() : '•';
         const isFirst = i === 0;
         const isLast = i === segments.length - 1;
 
         return (
-          <div
-            key={i}
-            className={styles.entry}
-            role="button"
-            tabIndex={0}
-            aria-pressed={active}
-            onClick={() => onPick(i)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                onPick(i);
-              }
-            }}
-          >
+          <div key={i} className={styles.entry}>
             {/* Timestamp */}
-            <time
-              dateTime={seg.t}
-              className={`${styles.ts} ${active ? styles.tsActive : ''}`}
-            >
+            <time dateTime={seg.t} className={styles.ts}>
               {seg.t}
             </time>
 
             {/* Continuous Rail + Node */}
             <div className={styles.rail} aria-hidden="true">
-              <div
-                className={`${styles.railLine} ${isFirst ? styles.railHidden : ''} ${active ? styles.railActive : ''}`}
-              />
-              <div className={`${styles.node} ${active ? styles.nodeActive : ''}`} />
-              <div
-                className={`${styles.railLine} ${isLast ? styles.railHidden : ''} ${active ? styles.railActive : ''}`}
-              />
+              <div className={`${styles.railLine} ${isFirst ? styles.railHidden : ''}`} />
+              <div className={styles.node} />
+              <div className={`${styles.railLine} ${isLast ? styles.railHidden : ''}`} />
             </div>
 
             {/* Content Card */}
-            <div className={`${styles.card} ${active ? styles.cardActive : ''}`}>
+            <div className={styles.card}>
               <div className={styles.cardHeader}>
                 {seg.sp && (
                   <span
@@ -103,7 +80,7 @@ export function MeetingTimeline({ segments, isInRange, onPick }: MeetingTimeline
                   </span>
                 )}
               </div>
-              <div className={`${styles.text} ${active ? styles.textActive : ''}`}>
+              <div className={styles.text}>
                 {seg.tx}
               </div>
             </div>
@@ -113,4 +90,3 @@ export function MeetingTimeline({ segments, isInRange, onPick }: MeetingTimeline
     </div>
   );
 }
-
