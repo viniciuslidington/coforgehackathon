@@ -23,13 +23,14 @@ class OverviewState(TypedDict):
     transcript: str
     title: str
     simple_summary: str
+    keywords: list[str]
 
 def _model() -> ChatOpenAI:
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
         raise RuntimeError("OPENROUTER_API_KEY is not configured. Add it to .env before calling the API.")
     return ChatOpenAI(
-        model=os.getenv("OPENROUTER_MODEL", "openai/gpt-4.1-mini"),
+        model=os.getenv("OPENROUTER_MODEL"),
         api_key=api_key,
         base_url="https://openrouter.ai/api/v1",
         temperature=0,
@@ -53,11 +54,13 @@ def answer_question(state: MeetingState) -> MeetingState:
     return {"result": str(response.content)}
 
 def create_overview(state: OverviewState) -> OverviewState:
-    response = _model().invoke([SystemMessage(content="You prepare a meeting-list row from meeting context. Return exactly two lines and no markdown: TITLE: a specific, simple title of at most 8 words, then SUMMARY: one concise paragraph of at most 70 words. Use only facts from the meeting."), HumanMessage(content=f"Meeting context:\n{state['transcript']}")])
+    response = _model().invoke([SystemMessage(content="You prepare a meeting-list row from meeting context. Return exactly three lines and no markdown: TITLE: a specific, simple title of at most 8 words; SUMMARY: one concise paragraph of at most 70 words; KEYWORDS: 3 to 8 comma-separated important subjects, people, companies, or topics explicitly mentioned in the meeting. Use only facts from the meeting."), HumanMessage(content=f"Meeting context:\n{state['transcript']}")])
     lines = str(response.content).splitlines()
     title = next((line.removeprefix("TITLE:").strip() for line in lines if line.startswith("TITLE:")), "Meeting overview")
     summary = next((line.removeprefix("SUMMARY:").strip() for line in lines if line.startswith("SUMMARY:")), "No summary was generated.")
-    return {"title": title, "simple_summary": summary}
+    raw_keywords = next((line.removeprefix("KEYWORDS:").strip() for line in lines if line.startswith("KEYWORDS:")), "")
+    keywords = [keyword.strip() for keyword in raw_keywords.split(",") if keyword.strip()]
+    return {"title": title, "simple_summary": summary, "keywords": keywords}
 
 def choose_task(state: MeetingState) -> str:
     return "question" if state.get("question") else "summary"
@@ -82,6 +85,6 @@ def run_meeting_agent(*, transcript: str, mode: Mode = "simple", focus_points: l
         state["question"] = question
     return meeting_graph.invoke(state)["result"]
 
-def generate_meeting_overview(transcript: str) -> tuple[str, str]:
+def generate_meeting_overview(transcript: str) -> tuple[str, str, list[str]]:
     result = overview_graph.invoke({"transcript": transcript})
-    return result["title"], result["simple_summary"]
+    return result["title"], result["simple_summary"], result["keywords"]

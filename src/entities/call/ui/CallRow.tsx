@@ -1,69 +1,41 @@
 'use client';
 
-import type { Call } from '../model/types';
-import { FlagBadge } from './FlagBadge';
-import { PriorityBadge } from './PriorityBadge';
+import type { MeetingSummary } from '@/entities/meeting/model/types';
 import styles from './CallRow.module.css';
 
 interface CallRowProps {
-  call: Call;
-  onClick: () => void;
+  meeting: MeetingSummary;
 }
 
-export function CallRow({ call, onClick }: CallRowProps) {
-  const isUrgent = call.tier === 'urgent';
-  const highMentions = call.mentions >= 3;
+export function CallRow({ meeting }: CallRowProps) {
+  const date = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+    .format(new Date(`${meeting.meeting_date}T00:00:00`));
+  const duration = `${Math.floor(meeting.duration_seconds / 60)}m ${meeting.duration_seconds % 60}s`;
 
   return (
-    <div
-      className={`${styles.row} ${isUrgent ? styles.urgent : ''}`}
-      onClick={onClick}
-    >
-      {/* Time */}
+    <article className={styles.row}>
       <div>
-        <div className={styles.time}>{call.time}</div>
-        <div className={styles.duration}>{call.dur}</div>
+        <div className={styles.time}>{date}</div>
       </div>
 
-      {/* Counterparty */}
+      <div className={styles.duration}>{duration}</div>
+
       <div>
-        <div
-          className={styles.counterparty}
-          style={{ color: highMentions ? 'var(--urgent)' : 'var(--text-secondary-strong)' }}
-        >
-          {call.cp}
-        </div>
-        <div className={styles.channel}>{call.channel}</div>
+        <div className={styles.counterparty}>{meeting.title}</div>
+        <div className={styles.channel}>{meeting.participants.join(', ') || 'No participants'}</div>
       </div>
 
-      {/* AI Summary */}
+      <div className={styles.participants}>{meeting.participants.join(', ') || 'No participants'}</div>
+
       <div className={styles.summaryCol}>
-        <div className={styles.summaryText}>{call.summary}</div>
-        {call.flags.length > 0 && (
-          <div className={styles.flags}>
-            {call.flags.map((f) => (
-              <FlagBadge key={f.label} flag={f} />
-            ))}
-          </div>
-        )}
+        <div className={styles.summaryText}>{meeting.simple_summary}</div>
       </div>
 
-      {/* Mentions */}
-      <div className={styles.mentionsCol}>
-        <div
-          className={styles.mentionsBadge}
-          data-level={
-            highMentions ? 'high' : call.mentions > 0 ? 'some' : 'none'
-          }
-        >
-          {call.mentions}
-        </div>
+      <div className={styles.keywords}>
+        {meeting.keywords.length ? meeting.keywords.map((keyword) => (
+          <span key={keyword} className={styles.keyword}>{keyword}</span>
+        )) : <span className={styles.emptyKeyword}>No keywords yet</span>}
       </div>
-
-      {/* Priority */}
-      <div>
-        <PriorityBadge tier={call.tier} score={call.score} />
-      </div>
-    </div>
+    </article>
   );
 }
