@@ -33,11 +33,13 @@
 
 /* ── Timestamp ─────────────────────────────────────────────────── */
 .ts {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   font-family: var(--font-mono);
   font-size: 11.5px;
   font-variant-numeric: tabular-nums;
   color: var(--text-dimmest);
-  padding-top: 10px;
   text-align: right;
   white-space: nowrap;
   user-select: none;

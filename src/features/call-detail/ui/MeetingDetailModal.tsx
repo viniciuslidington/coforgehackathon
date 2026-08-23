@@ -14,6 +14,7 @@ interface MeetingDetailModalProps {
   segmentsError: string | null;
   messages: ChatMessage[];
   draft: string;
+  asking: boolean;
   onClose: () => void;
   onDraftChange: (value: string) => void;
   onSend: () => void;
@@ -26,6 +27,7 @@ export function MeetingDetailModal({
   segmentsError,
   messages,
   draft,
+  asking,
   onClose,
   onDraftChange,
   onSend,
@@ -95,6 +97,7 @@ export function MeetingDetailModal({
           <DetailChat
             messages={messages}
             draft={draft}
+            asking={asking}
             onDraftChange={onDraftChange}
             onSend={onSend}
           />

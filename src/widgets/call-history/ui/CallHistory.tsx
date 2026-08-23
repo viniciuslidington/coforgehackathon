@@ -142,6 +142,7 @@ export function CallHistory() {
           segmentsError={meetingDetail.segmentsError}
           messages={meetingDetail.messages}
           draft={meetingDetail.draft}
+          asking={meetingDetail.asking}
           onClose={meetingDetail.closeMeeting}
           onDraftChange={meetingDetail.setDraft}
           onSend={meetingDetail.sendMessage}

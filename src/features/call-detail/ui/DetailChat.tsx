@@ -7,6 +7,7 @@ import styles from './DetailChat.module.css';
 interface DetailChatProps {
   messages: ChatMessage[];
   draft: string;
+  asking: boolean;
   onDraftChange: (value: string) => void;
   onSend: () => void;
 }
@@ -14,6 +15,7 @@ interface DetailChatProps {
 export function DetailChat({
   messages,
   draft,
+  asking,
   onDraftChange,
   onSend,
 }: DetailChatProps) {
@@ -40,8 +42,9 @@ export function DetailChat({
             onKeyDown={e => { if (e.key === 'Enter') onSend(); }}
             placeholder="Ask about this meeting…"
             className={styles.input}
+            disabled={asking}
           />
-          <button className={styles.sendBtn} onClick={onSend}>
+          <button className={styles.sendBtn} onClick={onSend} disabled={asking}>
             Ask
           </button>
         </div>

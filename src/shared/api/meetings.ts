@@ -30,3 +30,17 @@ export async function getMeetingTranscript(meetingId: string, signal?: AbortSign
   }
   return response.json() as Promise<MeetingSegment[]>;
 }
+
+export async function askMeetingQuestion(meetingId: string, question: string, signal?: AbortSignal): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}/meeting-summaries/${meetingId}/questions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question }),
+    signal,
+  });
+  if (!response.ok) {
+    throw new Error(`Could not get an answer (${response.status}).`);
+  }
+  const data = await response.json() as { result: string };
+  return data.result;
+}

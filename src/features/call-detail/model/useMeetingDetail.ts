@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import type { ChatMessage, MeetingSegment, MeetingSummary } from '@/entities/meeting/model/types';
-import { getMeetingTranscript } from '@/shared/api/meetings';
+import { askMeetingQuestion, getMeetingTranscript } from '@/shared/api/meetings';
 
 export function useMeetingDetail() {
   const [selectedMeeting, setSelectedMeeting] = useState<MeetingSummary | null>(null);
@@ -11,6 +11,7 @@ export function useMeetingDetail() {
   const [segmentsError, setSegmentsError] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [asking, setAsking] = useState(false);
 
   useEffect(() => {
     if (!selectedMeeting) return;
@@ -41,11 +42,9 @@ export function useMeetingDetail() {
     setSegments([]);
     setSegmentsError(null);
     setDraft('');
+    setAsking(false);
     setMessages([
-      {
-        role: 'ai',
-        text: 'Ask anything about this meeting. The AI Q&A endpoint is not connected yet — this is a UI preview.',
-      },
+      { role: 'ai', text: 'Ask anything about this meeting.' },
     ]);
   }, []);
 
@@ -55,14 +54,26 @@ export function useMeetingDetail() {
 
   const sendMessage = useCallback(() => {
     const q = draft.trim();
-    if (!q || !selectedMeeting) return;
+    if (!q || !selectedMeeting || asking) return;
     setDraft('');
+    setAsking(true);
     setMessages(prev => [
       ...prev,
       { role: 'user', text: q },
-      { role: 'ai', text: 'AI Q&A for this meeting is not wired up yet — this reply is a UI placeholder.' },
+      { role: 'ai', text: 'Thinking…' },
     ]);
-  }, [draft, selectedMeeting]);
+    askMeetingQuestion(selectedMeeting.meeting_id, q)
+      .then((answer) => {
+        setMessages(prev => [...prev.slice(0, -1), { role: 'ai', text: answer }]);
+      })
+      .catch((error: unknown) => {
+        const text = error instanceof Error ? error.message : 'Could not get an answer.';
+        setMessages(prev => [...prev.slice(0, -1), { role: 'ai', text }]);
+      })
+      .finally(() => {
+        setAsking(false);
+      });
+  }, [draft, selectedMeeting, asking]);
 
   return {
     selectedMeeting,
@@ -72,6 +83,7 @@ export function useMeetingDetail() {
     messages,
     draft,
     setDraft,
+    asking,
     openMeeting,
     closeMeeting,
     sendMessage,

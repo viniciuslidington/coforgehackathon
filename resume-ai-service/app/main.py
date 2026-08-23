@@ -225,6 +225,15 @@ def get_meeting_transcript(meeting_id: str) -> list[TranscriptSegment]:
         raise HTTPException(status_code=404, detail=f"No transcript found for meeting '{meeting_id}'.")
     return [caption_to_segment(caption) for caption in captions]
 
+@app.post("/meeting-summaries/{meeting_id}/questions", response_model=MeetingResponse)
+def ask_meeting_question(meeting_id: str, request: QuestionRequest) -> MeetingResponse:
+    """Answer one question grounded in a stored meeting's full transcript."""
+    captions = transcript_repository.get_captions(meeting_id)
+    if captions is None:
+        raise HTTPException(status_code=404, detail=f"No transcript found for meeting '{meeting_id}'.")
+    transcript = transcript_from_captions(captions)
+    return MeetingResponse(result=execute_agent(transcript, "simple", None, request.question), caption_count=len(captions))
+
 def find_sample_meeting(meeting_id: str):
     meeting = get_meeting(meeting_id)
     if not meeting:
