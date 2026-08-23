@@ -12,7 +12,7 @@ export function Header({ onReBrief }: HeaderProps) {
     <header className={styles.header}>
       <div>
         <div className={styles.titleRow}>
-          <h1 className={styles.title}>Shift Briefing</h1>
+          <h1 className={styles.title}>Shift</h1>
           <div className={styles.liveBadge}>
             <div className={styles.liveDot} />
             <span className={styles.liveText}>LIVE · 4 HOOTS</span>

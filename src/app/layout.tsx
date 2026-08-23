@@ -15,9 +15,14 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Shift Briefing — Trading Desk Intelligence',
+  title: 'ResumeAI Coforge — Meeting Insights & Intelligence',
   description:
-    'AI-powered shift briefing dashboard for trading desks. See what you missed, who tried to reach you, and what changed while you were away.',
+    'AI-powered meeting insights and shift briefing platform by Coforge. Transcripts, summaries, action items, and Q&A powered by LangGraph.',
+  icons: {
+    icon: '/icon.svg',
+    shortcut: '/icon.svg',
+    apple: '/icon.svg',
+  },
 };
 
 export default function RootLayout({
