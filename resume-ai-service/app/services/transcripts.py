@@ -1,45 +1,40 @@
 """Transcript lookup, abstracted from where captions actually live.
 
-Callers depend only on TranscriptRepository. Today's implementation reads
-sample .vtt files from disk; a future DatabaseTranscriptRepository can read
-persisted captions instead without changing any caller.
+Callers depend only on TranscriptRepository. Captions are resolved from the
+R2 bucket the transcript generator writes into.
 """
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Protocol
 
-from app.core.config import SAMPLES_DIR
 from app.core.vtt import Caption, parse_vtt
-from app.services.sample_meetings import get_meeting
+from app.services.r2_storage import get_r2_vtt_content
 
 
 class TranscriptRepository(Protocol):
     def get_captions(self, meeting_id: str) -> list[Caption] | None: ...
 
 
-class FileTranscriptRepository:
-    """Resolves captions from the MEETINGS catalog + sample .vtt files on disk.
+class R2TranscriptRepository:
+    """Resolves captions from R2-hosted meeting VTTs, uploaded by the transcript generator.
 
-    Meeting lookup is O(1) via the existing MEETINGS dict; parsed captions are
-    cached in memory so repeat requests for the same meeting skip disk I/O and
-    re-parsing.
+    Meeting ids are the object key without its ".vtt" suffix. Parsed captions
+    are cached in memory so repeat requests skip the network round trip.
     """
 
-    def __init__(self, samples_dir: Path = SAMPLES_DIR) -> None:
-        self._samples_dir = samples_dir
+    def __init__(self) -> None:
         self._cache: dict[str, list[Caption]] = {}
 
     def get_captions(self, meeting_id: str) -> list[Caption] | None:
         if meeting_id in self._cache:
             return self._cache[meeting_id]
-        meeting = get_meeting(meeting_id)
-        if meeting is None:
+        try:
+            raw_vtt = get_r2_vtt_content(f"{meeting_id}.vtt")
+        except Exception:
             return None
-        raw_vtt = (self._samples_dir / meeting.filename).read_text(encoding="utf-8")
         captions = parse_vtt(raw_vtt)
         self._cache[meeting_id] = captions
         return captions
 
 
-transcript_repository: TranscriptRepository = FileTranscriptRepository()
+transcript_repository: TranscriptRepository = R2TranscriptRepository()

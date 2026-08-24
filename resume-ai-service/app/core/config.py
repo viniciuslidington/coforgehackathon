@@ -15,7 +15,6 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-SAMPLES_DIR = BASE_DIR / "samples"
 DATABASE_PATH = Path(os.getenv("MEETINGS_DATABASE_PATH", BASE_DIR / "meeting_insights.db"))
 
 CORS_ORIGINS = [origin.strip() for origin in os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")]
@@ -27,3 +26,8 @@ OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL")
 OPENROUTER_MAX_TOKENS = int(os.getenv("OPENROUTER_MAX_TOKENS", "1200"))
 OPENROUTER_SITE_URL = os.getenv("OPENROUTER_SITE_URL", "http://localhost:8000")
 OPENROUTER_APP_NAME = os.getenv("OPENROUTER_APP_NAME", "Meeting Insights API")
+
+R2_URL = os.getenv("R2_URL")
+R2_ACCESS_KEY_ID = os.getenv("ACCESS_KEY_ID")
+R2_SECRET_ACCESS_KEY = os.getenv("SECRET_ACCESS_KEY")
+R2_BUCKET_NAME = os.getenv("BUCKET_NAME", "hackathon-traders-vtt")

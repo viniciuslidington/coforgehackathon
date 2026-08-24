@@ -77,3 +77,8 @@ def list_summaries(*, offset: int, limit: int, date_from: str | None = None) -> 
             FROM meeting_summaries {where} ORDER BY meeting_date DESC, refreshed_at DESC LIMIT ? OFFSET ?
         """.format(where=where), (*parameters, limit, offset)).fetchall()
     return [dict(row) for row in rows], total
+
+def delete_summary(meeting_id: str) -> bool:
+    with connection() as conn:
+        cursor = conn.execute("DELETE FROM meeting_summaries WHERE meeting_id = ?", (meeting_id,))
+        return cursor.rowcount > 0
