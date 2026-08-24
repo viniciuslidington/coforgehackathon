@@ -55,28 +55,20 @@
   flex-wrap: wrap;
 }
 
-.cp {
-  font-family: var(--font-mono);
+.title {
   font-size: 16px;
   font-weight: 600;
 }
 
-.channel {
-  font-size: 13px;
-  color: var(--text-dim);
-}
-
-.timeInfo {
+.dateInfo {
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--text-dimmest);
 }
 
-.priorityPill {
-  padding: 3px 8px;
-  border-radius: 7px;
-  font-size: 11px;
-  border: 1px solid;
+.participants {
+  font-size: 13px;
+  color: var(--text-dim);
 }
 
 .summary {
@@ -86,6 +78,22 @@
   color: var(--text-secondary);
   max-width: 760px;
   text-wrap: pretty;
+}
+
+.keywords {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.keyword {
+  padding: 3px 7px;
+  border: 1px solid var(--border-4);
+  border-radius: 7px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--teal-pale);
 }
 
 .closeBtn {

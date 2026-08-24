@@ -17,3 +17,19 @@ export interface MeetingSummaryPage {
   page: number;
   page_size: number;
 }
+
+export interface MeetingSegment {
+  /** Timestamp string, e.g. "00:01:20" */
+  t: string;
+  /** Speaker label, e.g. "CITI-FX", "Renata" */
+  sp: string;
+  /** Segment text */
+  tx: string;
+  /** Optional flag label, e.g. "Deadline" */
+  flag?: string;
+}
+
+export interface ChatMessage {
+  role: 'user' | 'ai';
+  text: string;
+}

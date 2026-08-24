@@ -1,14 +1,12 @@
 """Minimal SQLite persistence for generated meeting overview rows."""
 from __future__ import annotations
 
-import os
 import sqlite3
 from contextlib import contextmanager
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Iterator
 
-DATABASE_PATH = Path(os.getenv("MEETINGS_DATABASE_PATH", Path(__file__).resolve().parent.parent / "meeting_insights.db"))
+from app.core.config import DATABASE_PATH
 
 SCHEMA = """
     CREATE TABLE IF NOT EXISTS meeting_summaries (

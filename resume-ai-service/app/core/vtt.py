@@ -44,3 +44,12 @@ def transcript_from_captions(captions: list[Caption]) -> str:
 def duration_seconds(captions: list[Caption]) -> int:
     """Return the elapsed duration from the first cue start to the last cue end."""
     return max(0, round(timestamp_seconds(captions[-1].end) - timestamp_seconds(captions[0].start)))
+
+def format_timestamp(seconds: float) -> str:
+    """Format elapsed seconds for display: M:SS, or H:MM:SS past one hour."""
+    total = round(seconds)
+    hours, remainder = divmod(total, 3600)
+    minutes, secs = divmod(remainder, 60)
+    if hours:
+        return f"{hours}:{minutes:02d}:{secs:02d}"
+    return f"{minutes}:{secs:02d}"

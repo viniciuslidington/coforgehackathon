@@ -1,0 +1,10 @@
+{
+  "venvPath": ".",
+  "venv": ".venv",
+  "python.analysis.extraPaths": [
+    "./.venv/lib/python3.14/site-packages",
+    "./.venv/lib/python3.13/site-packages",
+    "./.venv/lib/python3.12/site-packages",
+    "./.venv/lib/python3.11/site-packages"
+  ]
+}

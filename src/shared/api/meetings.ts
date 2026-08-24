@@ -1,4 +1,4 @@
-import type { MeetingPeriod, MeetingSummaryPage } from '@/entities/meeting/model/types';
+import type { MeetingPeriod, MeetingSegment, MeetingSummaryPage } from '@/entities/meeting/model/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_MEETING_API_URL ?? 'http://localhost:8000';
 
@@ -21,4 +21,26 @@ export async function getMeetingSummaries(
     throw new Error(`Could not load meetings (${response.status}).`);
   }
   return response.json() as Promise<MeetingSummaryPage>;
+}
+
+export async function getMeetingTranscript(meetingId: string, signal?: AbortSignal): Promise<MeetingSegment[]> {
+  const response = await fetch(`${API_BASE_URL}/meeting-summaries/${meetingId}/transcript`, { signal });
+  if (!response.ok) {
+    throw new Error(`Could not load transcript (${response.status}).`);
+  }
+  return response.json() as Promise<MeetingSegment[]>;
+}
+
+export async function askMeetingQuestion(meetingId: string, question: string, signal?: AbortSignal): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}/meeting-summaries/${meetingId}/questions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question }),
+    signal,
+  });
+  if (!response.ok) {
+    throw new Error(`Could not get an answer (${response.status}).`);
+  }
+  const data = await response.json() as { result: string };
+  return data.result;
 }

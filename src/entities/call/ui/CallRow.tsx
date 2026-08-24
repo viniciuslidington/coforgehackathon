@@ -5,15 +5,20 @@ import styles from './CallRow.module.css';
 
 interface CallRowProps {
   meeting: MeetingSummary;
+  onOpen?: (meeting: MeetingSummary) => void;
 }
 
-export function CallRow({ meeting }: CallRowProps) {
+export function CallRow({ meeting, onOpen }: CallRowProps) {
   const date = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
     .format(new Date(`${meeting.meeting_date}T00:00:00`));
   const duration = `${Math.floor(meeting.duration_seconds / 60)}m ${meeting.duration_seconds % 60}s`;
 
   return (
-    <article className={styles.row}>
+    <article
+      className={styles.row}
+      onClick={() => onOpen?.(meeting)}
+      style={onOpen ? { cursor: 'pointer' } : undefined}
+    >
       <div>
         <div className={styles.time}>{date}</div>
       </div>

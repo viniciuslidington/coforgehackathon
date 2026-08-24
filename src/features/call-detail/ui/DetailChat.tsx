@@ -1,39 +1,29 @@
 'use client';
 
-import type { ChatMessage } from '@/entities/call/model/types';
+import type { ChatMessage } from '@/entities/meeting/model/types';
 import { ChatMessageBubble } from '@/features/quick-chat/ui/ChatMessage';
 import styles from './DetailChat.module.css';
 
 interface DetailChatProps {
   messages: ChatMessage[];
   draft: string;
-  rangeText: string | null;
+  asking: boolean;
   onDraftChange: (value: string) => void;
   onSend: () => void;
-  onClearRange: () => void;
 }
 
 export function DetailChat({
   messages,
   draft,
-  rangeText,
+  asking,
   onDraftChange,
   onSend,
-  onClearRange,
 }: DetailChatProps) {
   return (
     <div className={styles.panel}>
       {/* Header */}
       <div className={styles.header}>
-        <div className={styles.title}>Ask about this call</div>
-        {rangeText && (
-          <div className={styles.rangePill}>
-            <span className={styles.rangeLabel}>RANGE {rangeText}</span>
-            <button className={styles.rangeClear} onClick={onClearRange}>
-              ×
-            </button>
-          </div>
-        )}
+        <div className={styles.title}>Ask about this meeting</div>
       </div>
 
       {/* Messages */}
@@ -50,10 +40,11 @@ export function DetailChat({
             value={draft}
             onChange={e => onDraftChange(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') onSend(); }}
-            placeholder={rangeText ? `Ask about ${rangeText}…` : 'Ask about this call…'}
+            placeholder="Ask about this meeting…"
             className={styles.input}
+            disabled={asking}
           />
-          <button className={styles.sendBtn} onClick={onSend}>
+          <button className={styles.sendBtn} onClick={onSend} disabled={asking}>
             Ask
           </button>
         </div>
