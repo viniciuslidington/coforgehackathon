@@ -9,8 +9,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Protocol
 
-from app.meetings import SAMPLES_DIR, get_meeting
-from app.vtt import Caption, parse_vtt
+from app.core.config import SAMPLES_DIR
+from app.core.vtt import Caption, parse_vtt
+from app.services.sample_meetings import get_meeting
 
 
 class TranscriptRepository(Protocol):
@@ -39,3 +40,6 @@ class FileTranscriptRepository:
         captions = parse_vtt(raw_vtt)
         self._cache[meeting_id] = captions
         return captions
+
+
+transcript_repository: TranscriptRepository = FileTranscriptRepository()

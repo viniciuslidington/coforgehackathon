@@ -2,11 +2,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 
-from app.vtt import duration_seconds, parse_vtt, transcript_from_captions
-
-SAMPLES_DIR = Path(__file__).resolve().parent.parent / "samples"
+from app.core.config import SAMPLES_DIR
+from app.core.vtt import duration_seconds, parse_vtt, transcript_from_captions
 
 @dataclass(frozen=True)
 class Meeting:
