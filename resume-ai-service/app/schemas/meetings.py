@@ -2,11 +2,6 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-class MeetingListItem(BaseModel):
-    id: str
-    title: str
-    description: str
-
 class StoredMeetingSummary(BaseModel):
     meeting_id: str
     title: str

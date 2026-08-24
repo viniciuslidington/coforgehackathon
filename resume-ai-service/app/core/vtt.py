@@ -109,6 +109,16 @@ def duration_seconds(captions: list[Caption]) -> int:
         return 0
     return max(0, round(timestamp_seconds(captions[-1].end) - timestamp_seconds(captions[0].start)))
 
+def participants_from_captions(captions: list[Caption]) -> list[str]:
+    """Get unique speaker names in first-appearance order from caption text."""
+    names: list[str] = []
+    for caption in captions:
+        possible_name, separator, _ = caption.text.partition(":")
+        name = possible_name.strip()
+        if separator and name and name not in names:
+            names.append(name)
+    return names
+
 def format_timestamp(seconds: float) -> str:
     """Format elapsed seconds for display: M:SS, or H:MM:SS past one hour."""
     total = round(seconds)
