@@ -1,4 +1,4 @@
-import type { MeetingPeriod, MeetingSegment, MeetingSummaryPage } from '@/entities/meeting/model/types';
+import type { MeetingPeriod, MeetingSegment, MeetingSummaryPage, SortKey } from '@/entities/meeting/model/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_MEETING_API_URL ?? 'http://localhost:8000';
 
@@ -14,9 +14,10 @@ export async function getMeetingSummaries(
   page: number,
   pageSize: number,
   topics: string[] = [],
+  sort: SortKey = 'priority',
   signal?: AbortSignal,
 ): Promise<MeetingSummaryPage> {
-  const params = new URLSearchParams({ period, page: String(page), page_size: String(pageSize) });
+  const params = new URLSearchParams({ period, page: String(page), page_size: String(pageSize), sort });
   for (const topic of topics) {
     if (topic.trim()) params.append('topics', topic.trim());
   }

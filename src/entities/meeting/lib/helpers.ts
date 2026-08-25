@@ -22,5 +22,5 @@ export function sortMeetings(meetings: MeetingSummary[], key: SortKey): MeetingS
   if (key === 'priority') {
     return sorted.sort((a, b) => (b.priority_score ?? -1) - (a.priority_score ?? -1));
   }
-  return sorted.sort((a, b) => (a.meeting_date < b.meeting_date ? 1 : -1));
+  return sorted.sort((a, b) => b.meeting_date.localeCompare(a.meeting_date));
 }

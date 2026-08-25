@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import type { MeetingPeriod, MeetingSummaryPage } from '@/entities/meeting/model/types';
 import { getMeetingSummaries, syncMeetings } from '@/shared/api/meetings';
 import { CallRow } from '@/entities/meeting/ui/CallRow';
-import { sortMeetings } from '@/entities/meeting/lib/helpers';
 import { useMeetingDetail } from '@/features/call-detail/model/useMeetingDetail';
 import { MeetingDetailModal } from '@/features/call-detail/ui/MeetingDetailModal';
 import { useCallFilters } from '@/features/call-filters/model/useCallFilters';
@@ -28,24 +27,44 @@ export function CallHistory() {
   const [syncing, setSyncing] = useState(false);
   const meetingDetail = useMeetingDetail();
   const [topicsInput, setTopicsInput] = useState('');
+  const [debouncedTopicsInput, setDebouncedTopicsInput] = useState('');
   const { sort, selectSort } = useCallFilters();
 
   useEffect(() => {
-    const saved = window.localStorage.getItem('meeting-topics');
-    if (saved) setTopicsInput(saved);
+    try {
+      const saved = window.localStorage.getItem('meeting-topics');
+      if (saved) setTopicsInput(saved);
+    } catch {
+      // Storage may be unavailable (e.g. Safari private mode) — just skip restoring.
+    }
   }, []);
 
-  const topics = topicsInput.split(',').map((t) => t.trim()).filter(Boolean);
+  // Debounce the value that actually drives the fetch, so we don't fire a
+  // request (and a real ONNX embedding inference) on every keystroke.
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebouncedTopicsInput(topicsInput), 300);
+    return () => clearTimeout(timeout);
+  }, [topicsInput]);
+
+  const topics = debouncedTopicsInput.split(',').map((t) => t.trim()).filter(Boolean);
 
   const applyTopics = (value: string) => {
+    if (value !== topicsInput) {
+      setLoading(true);
+      setPage(1);
+    }
     setTopicsInput(value);
-    window.localStorage.setItem('meeting-topics', value);
+    try {
+      window.localStorage.setItem('meeting-topics', value);
+    } catch {
+      // Storage may be unavailable (e.g. Safari private mode) — just skip persisting.
+    }
   };
 
   useEffect(() => {
     const controller = new AbortController();
     let active = true;
-    getMeetingSummaries(period, page, pageSize, topics, controller.signal)
+    getMeetingSummaries(period, page, pageSize, topics, sort, controller.signal)
       .then((result) => {
         if (active) setData(result);
       })
@@ -62,7 +81,7 @@ export function CallHistory() {
       controller.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, pageSize, period, topicsInput]);
+  }, [page, pageSize, period, debouncedTopicsInput, sort]);
 
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -89,7 +108,7 @@ export function CallHistory() {
       setPage(1);
       // Changing the page alone does not retrigger the request when already
       // on page one, so reload the current result explicitly after syncing.
-      const refreshed = await getMeetingSummaries(period, 1, pageSize);
+      const refreshed = await getMeetingSummaries(period, 1, pageSize, topics, sort);
       setData(refreshed);
     } catch (syncError: unknown) {
       setError(syncError instanceof Error ? syncError.message : 'Could not sync meetings.');
@@ -147,12 +166,13 @@ export function CallHistory() {
         <div>PARTICIPANTS</div>
         <div>AI SUMMARY</div>
         <div>KEYWORDS</div>
+        <div>PRIORITY</div>
       </div>
 
       <div className={styles.rows} aria-live="polite">
         {error && <p className={styles.message}>{error} Check that the Meeting Insights API is running.</p>}
         {!error && !loading && data?.items.length === 0 && <p className={styles.message}>No meetings found for this date range.</p>}
-        {(data ? sortMeetings(data.items, sort) : []).map((meeting) => (
+        {(data?.items ?? []).map((meeting) => (
           <CallRow key={meeting.meeting_id} meeting={meeting} onOpen={meetingDetail.openMeeting} />
         ))}
       </div>
