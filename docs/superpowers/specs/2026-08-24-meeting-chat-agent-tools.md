@@ -56,9 +56,9 @@ useMeetingDetail.ts ──session_id, question──▶  POST /meeting-summaries
 ### `app/graphs/meeting_chat/` (reescrito)
 
 - **`state.py`** — `ChatState` ganha `messages: Annotated[list[BaseMessage], add_messages]` (padrão LangGraph para histórico gerenciado pelo checkpointer) além dos campos já existentes (`meeting_id`, `transcript`).
-- **`graph.py`** — vira um grafo de dois nodes: `agent` (LLM com `bind_tools`) e `tools` (`ToolNode`), com aresta condicional (`tools_condition`) voltando de `tools` pra `agent` até a resposta final não pedir mais tool. Compilado com `checkpointer=SqliteSaver` (ver abaixo), `thread_id=session_id`.
+- **`graph.py`** — vira um grafo de três nodes: `agent` (LLM com `bind_tools`), `tools` (`ToolNode`) e `synthesize` (resposta final sem tools). A aresta condicional volta de `tools` para `agent` enquanto houver tool calls; quando o agente não pedir mais tools, segue para `synthesize`, que transforma o rascunho/raciocínio e as evidências em uma resposta exclusivamente user-facing. Compilado com `checkpointer=SqliteSaver` (ver abaixo), `thread_id=session_id`.
 - **`tools.py`** — implementa as 7 tools (ver seção Tools).
-- **`nodes.py`** — node do agente principal + node dedicado de síntese geopolítica (`get_geopolitical_analysis` roda sua própria chamada LLM focada, não reaproveita o histórico da conversa principal).
+- **`nodes.py`** — node do agente principal, node de síntese da resposta final e node dedicado de síntese geopolítica (`get_geopolitical_analysis` roda sua própria chamada LLM focada, não reaproveita o histórico da conversa principal). O rascunho do agente nunca é enviado ao frontend e é substituído pela resposta sintetizada no histórico persistido.
 - **`prompts.py`** — prompt atual mantido (atribuição por falante/timestamp) **+** nova regra: toda informação vinda de tool externa (Finnhub) deve ser citada explicitamente como tal (fonte + momento), nunca misturada sem distinção com o que foi dito na reunião.
 
 ### Tools (`app/graphs/meeting_chat/tools.py`)
@@ -103,7 +103,7 @@ Toda tool externa: timeout curto (ex: 5s), captura exceção/timeout e retorna u
 
 - `POST /meeting-summaries/{meeting_id}/questions` **substituído** (não duplicado — único consumidor real é `DetailChat`) por uma versão que retorna `StreamingResponse(media_type="text/event-stream")`.
 - Request (`QuestionRequest`) ganha `session_id: str`.
-- Stream: itera `graph.stream(..., stream_mode="updates")`; a cada node executado, emite `data: {"type": "step", "label": "<label amigável>"}\n\n` (mapeamento nome-do-node → label em `prompts.py` ou `nodes.py`); ao final, `data: {"type": "answer", "text": "...", "caption_count": N}\n\n`.
+- Stream: itera `graph.stream(..., stream_mode="updates")`; a cada node executado, emite `data: {"type": "step", "label": "<label amigável>"}\n\n` (mapeamento nome-do-node → label em `prompts.py` ou `nodes.py`); somente a saída de `synthesize` gera o evento final `data: {"type": "answer", "text": "...", "caption_count": N}\n\n`.
 - Erro de tool não interrompe o stream — vira parte do reasoning do agente (fallback gracioso já tratado na tool). Erro de infraestrutura (OpenRouter fora do ar) ainda pode emitir um evento `{"type": "error", "detail": "..."}` antes de fechar o stream.
 
 ### `app/schemas/agent.py`

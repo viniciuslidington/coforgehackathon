@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { ChatMessage, MeetingSegment, MeetingSummary } from '@/entities/meeting/model/types';
 import { askMeetingQuestion, getMeetingTranscript } from '@/shared/api/meetings';
 
@@ -12,13 +12,14 @@ export function useMeetingDetail() {
   const [draft, setDraft] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [asking, setAsking] = useState(false);
+  const [steps, setSteps] = useState<string[]>([]);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const questionController = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (!selectedMeeting) return;
     const controller = new AbortController();
     let active = true;
-    setSegmentsLoading(true);
-    setSegmentsError(null);
     getMeetingTranscript(selectedMeeting.meeting_id, controller.signal)
       .then((result) => {
         if (active) setSegments(result);
@@ -38,42 +39,76 @@ export function useMeetingDetail() {
   }, [selectedMeeting]);
 
   const openMeeting = useCallback((meeting: MeetingSummary) => {
+    questionController.current?.abort();
     setSelectedMeeting(meeting);
     setSegments([]);
+    setSegmentsLoading(true);
     setSegmentsError(null);
     setDraft('');
     setAsking(false);
+    setSteps([]);
+    setSessionId(crypto.randomUUID());
     setMessages([
       { role: 'ai', text: 'Ask anything about this meeting.' },
     ]);
   }, []);
 
   const closeMeeting = useCallback(() => {
+    questionController.current?.abort();
+    questionController.current = null;
     setSelectedMeeting(null);
+    setSegments([]);
+    setMessages([]);
+    setSteps([]);
+    setSessionId(null);
+    setAsking(false);
   }, []);
 
-  const sendMessage = useCallback(() => {
+  const sendMessage = useCallback(async () => {
     const q = draft.trim();
-    if (!q || !selectedMeeting || asking) return;
+    if (!q || !selectedMeeting || !sessionId || asking) return;
+    const controller = new AbortController();
+    questionController.current = controller;
     setDraft('');
     setAsking(true);
+    setSteps([]);
     setMessages(prev => [
       ...prev,
       { role: 'user', text: q },
-      { role: 'ai', text: 'Thinking…' },
     ]);
-    askMeetingQuestion(selectedMeeting.meeting_id, q)
-      .then((answer) => {
-        setMessages(prev => [...prev.slice(0, -1), { role: 'ai', text: answer }]);
-      })
-      .catch((error: unknown) => {
+
+    try {
+      await askMeetingQuestion(
+        selectedMeeting.meeting_id,
+        q,
+        sessionId,
+        (event) => {
+          if (controller.signal.aborted) return;
+          if (event.type === 'step') {
+            setSteps(prev => [...prev, event.label]);
+          } else if (event.type === 'answer') {
+            setMessages(prev => [...prev, { role: 'ai', text: event.text }]);
+            setSteps([]);
+          } else {
+            setMessages(prev => [...prev, { role: 'ai', text: event.detail }]);
+            setSteps([]);
+          }
+        },
+        controller.signal,
+      );
+    } catch (error: unknown) {
+      if (!(error instanceof DOMException && error.name === 'AbortError')) {
         const text = error instanceof Error ? error.message : 'Could not get an answer.';
-        setMessages(prev => [...prev.slice(0, -1), { role: 'ai', text }]);
-      })
-      .finally(() => {
+        setMessages(prev => [...prev, { role: 'ai', text }]);
+        setSteps([]);
+      }
+    } finally {
+      if (questionController.current === controller) {
+        questionController.current = null;
         setAsking(false);
-      });
-  }, [draft, selectedMeeting, asking]);
+      }
+    }
+  }, [draft, selectedMeeting, sessionId, asking]);
 
   return {
     selectedMeeting,
@@ -84,6 +119,7 @@ export function useMeetingDetail() {
     draft,
     setDraft,
     asking,
+    steps,
     openMeeting,
     closeMeeting,
     sendMessage,

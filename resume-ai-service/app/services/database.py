@@ -71,6 +71,18 @@ def summary_has_keywords(meeting_id: str) -> bool:
         row = conn.execute("SELECT keywords, duration_seconds FROM meeting_summaries WHERE meeting_id = ?", (meeting_id,)).fetchone()
     return bool(row and row["keywords"].strip() and row["duration_seconds"] > 0)
 
+def get_summary(meeting_id: str) -> dict[str, object] | None:
+    with connection() as conn:
+        row = conn.execute(
+            """
+            SELECT meeting_id, title, meeting_date, participants, simple_summary,
+                   keywords, duration_seconds, refreshed_at
+            FROM meeting_summaries WHERE meeting_id = ?
+            """,
+            (meeting_id,),
+        ).fetchone()
+    return dict(row) if row else None
+
 def list_summaries(*, offset: int, limit: int, date_from: str | None = None) -> tuple[list[dict[str, str]], int]:
     with connection() as conn:
         where = "WHERE meeting_date >= ?" if date_from else ""

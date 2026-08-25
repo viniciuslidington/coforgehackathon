@@ -20,12 +20,14 @@ DATABASE_PATH = Path(os.getenv("MEETINGS_DATABASE_PATH", BASE_DIR / "meeting_ins
 CORS_ORIGINS = [origin.strip() for origin in os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")]
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL")
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openrouter/free")
 # Some OpenRouter models otherwise default to a very large output reservation
 # (for example 65,536 tokens), exceeding demo credit limits.
 OPENROUTER_MAX_TOKENS = int(os.getenv("OPENROUTER_MAX_TOKENS", "1200"))
 OPENROUTER_SITE_URL = os.getenv("OPENROUTER_SITE_URL", "http://localhost:8000")
 OPENROUTER_APP_NAME = os.getenv("OPENROUTER_APP_NAME", "Meeting Insights API")
+
+FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY")
 
 R2_URL = os.getenv("R2_URL")
 R2_ACCESS_KEY_ID = os.getenv("ACCESS_KEY_ID")

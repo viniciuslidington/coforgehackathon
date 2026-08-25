@@ -36,16 +36,60 @@ export async function getMeetingTranscript(meetingId: string, signal?: AbortSign
   return response.json() as Promise<MeetingSegment[]>;
 }
 
-export async function askMeetingQuestion(meetingId: string, question: string, signal?: AbortSignal): Promise<string> {
+export type MeetingQuestionEvent =
+  | { type: 'step'; label: string }
+  | { type: 'answer'; text: string; caption_count: number }
+  | { type: 'error'; detail: string };
+
+export async function askMeetingQuestion(
+  meetingId: string,
+  question: string,
+  sessionId: string,
+  onEvent: (event: MeetingQuestionEvent) => void,
+  signal?: AbortSignal,
+): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/meeting-summaries/${meetingId}/questions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ question }),
+    body: JSON.stringify({ question, session_id: sessionId }),
     signal,
   });
   if (!response.ok) {
     throw new Error(`Could not get an answer (${response.status}).`);
   }
-  const data = await response.json() as { result: string };
-  return data.result;
+  if (!response.body) {
+    throw new Error('The answer stream is unavailable in this browser.');
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let terminalEventReceived = false;
+
+  const emitFrames = (flush = false) => {
+    buffer = buffer.replaceAll('\r\n', '\n');
+    const frames = buffer.split('\n\n');
+    buffer = flush ? '' : (frames.pop() ?? '');
+    for (const frame of frames) {
+      const payload = frame
+        .split('\n')
+        .filter(line => line.startsWith('data:'))
+        .map(line => line.slice(5).trimStart())
+        .join('\n');
+      if (!payload) continue;
+      const event = JSON.parse(payload) as MeetingQuestionEvent;
+      if (event.type === 'answer' || event.type === 'error') terminalEventReceived = true;
+      onEvent(event);
+    }
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    buffer += decoder.decode(value, { stream: !done });
+    emitFrames(done);
+    if (done) break;
+  }
+  if (!terminalEventReceived) {
+    throw new Error('The answer stream ended before returning a result.');
+  }
 }

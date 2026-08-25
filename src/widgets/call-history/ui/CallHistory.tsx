@@ -38,13 +38,16 @@ export function CallHistory() {
   // happen post-mount to avoid a hydration mismatch between the server's
   // empty render and the client's real stored value.
   useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem(TOPICS_STORAGE_KEY);
-      if (saved) setTopics(JSON.parse(saved) as string[]);
-    } catch {
-      // Storage may be unavailable (e.g. Safari private mode), or hold a
-      // stale/invalid value — either way, just keep the empty default.
-    }
+    const restoreTopics = window.setTimeout(() => {
+      try {
+        const saved = window.localStorage.getItem(TOPICS_STORAGE_KEY);
+        if (saved) setTopics(JSON.parse(saved) as string[]);
+      } catch {
+        // Storage may be unavailable (e.g. Safari private mode), or hold a
+        // stale/invalid value — either way, just keep the empty default.
+      }
+    }, 0);
+    return () => window.clearTimeout(restoreTopics);
   }, []);
 
   const applyTopics = (next: string[]) => {
@@ -178,6 +181,7 @@ export function CallHistory() {
           messages={meetingDetail.messages}
           draft={meetingDetail.draft}
           asking={meetingDetail.asking}
+          steps={meetingDetail.steps}
           onClose={meetingDetail.closeMeeting}
           onDraftChange={meetingDetail.setDraft}
           onSend={meetingDetail.sendMessage}

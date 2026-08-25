@@ -6,7 +6,7 @@ Hackathon-ready Python API that turns missed meetings into short summaries, deta
 
 ```bash
 cp .env.example .env
-# set OPENROUTER_API_KEY in .env
+# set OPENROUTER_API_KEY and FINNHUB_API_KEY in .env
 # OPENROUTER_MAX_TOKENS=1200 is a safe summary/Q&A output cap
 uv sync
 uv run uvicorn app.main:app --reload
@@ -29,10 +29,11 @@ curl http://127.0.0.1:8000/meetings
 # Summarise a known meeting by ID
 curl -X POST 'http://127.0.0.1:8000/meetings/product-planning/summaries?mode=detailed&focus_points=risks,action%20items'
 
-# Ask a question about a known meeting by ID
-curl -X POST http://127.0.0.1:8000/meetings/customer-feedback/questions \
+# Ask a question about a known meeting by ID. The response is an SSE stream;
+# reuse session_id for follow-up questions in the same modal session.
+curl -N -X POST http://127.0.0.1:8000/meeting-summaries/customer-feedback/questions \
   -H 'Content-Type: application/json' \
-  -d '{"question":"What work is committed for September?"}'
+  -d '{"question":"What work is committed for September?","session_id":"demo-session-001"}'
 
 # Short summary, optionally prioritising selected topics
 curl -X POST http://127.0.0.1:8000/summaries -F 'vtt_file=@samples/product-planning.vtt' -F 'mode=simple' -F 'focus_points=decisions, risks, action items'
