@@ -56,7 +56,7 @@ def test_score_meeting_with_no_topics_is_zero():
 
 
 def test_tier_thresholds():
-    assert priority.tier_for_score(70.0) == "urgent"
-    assert priority.tier_for_score(69.999) == "high"
-    assert priority.tier_for_score(40.0) == "high"
-    assert priority.tier_for_score(39.999) == "normal"
+    assert priority.tier_for_score(55.0) == "urgent"
+    assert priority.tier_for_score(54.999) == "high"
+    assert priority.tier_for_score(30.0) == "high"
+    assert priority.tier_for_score(29.999) == "normal"

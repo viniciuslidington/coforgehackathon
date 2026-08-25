@@ -15,8 +15,12 @@ from fastembed import TextEmbedding
 
 MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 
-URGENT_THRESHOLD = 70.0
-HIGH_THRESHOLD = 40.0
+# This model's cosine similarities for meeting-vs-topic text in this domain
+# sit roughly in [0, 0.7], not the full [-1, 1] range, so thresholds are
+# calibrated against that observed range rather than against a theoretical
+# midpoint.
+URGENT_THRESHOLD = 55.0
+HIGH_THRESHOLD = 30.0
 
 _model: TextEmbedding | None = None
 _topic_cache: dict[str, np.ndarray] = {}
@@ -42,8 +46,13 @@ def _get_model() -> TextEmbedding:
 
 
 def embed_passage(text: str) -> np.ndarray:
-    """Embed meeting-side text (title + simple_summary + keywords)."""
-    (vector,) = _get_model().embed([f"passage: {text}"])
+    """Embed meeting-side text (title + simple_summary + keywords).
+
+    Note: MODEL_NAME is a plain sentence-transformers model, not an E5
+    model, so it does not use "query:"/"passage:" instruction prefixes —
+    text is embedded as-is.
+    """
+    (vector,) = _get_model().embed([text])
     return vector
 
 
@@ -51,7 +60,7 @@ def embed_topic(topic: str) -> np.ndarray:
     """Embed a user-supplied topic, cached by normalized text."""
     key = topic.strip().lower()
     if key not in _topic_cache:
-        (vector,) = _get_model().embed([f"query: {topic}"])
+        (vector,) = _get_model().embed([topic])
         _topic_cache[key] = vector
     return _topic_cache[key]
 
@@ -76,8 +85,7 @@ def score_meeting(meeting_vector: np.ndarray, topic_vectors: list[np.ndarray]) -
     if not topic_vectors:
         return 0.0
     best_cosine = max(cosine_similarity(meeting_vector, topic_vector) for topic_vector in topic_vectors)
-    clamped = max(-1.0, min(1.0, best_cosine))
-    return (clamped + 1.0) / 2.0 * 100.0
+    return max(0.0, best_cosine) * 100.0
 
 
 def tier_for_score(score: float) -> Literal["urgent", "high", "normal"]:
