@@ -1,6 +1,5 @@
 import type { ContextLabel, KeyPoint } from './types';
 
-
 export const CONTEXTS: ContextLabel[] = [
   'Last 5 calls',
   'Last 2 hours',
