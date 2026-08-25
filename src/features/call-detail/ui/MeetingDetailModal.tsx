@@ -15,6 +15,7 @@ interface MeetingDetailModalProps {
   messages: ChatMessage[];
   draft: string;
   asking: boolean;
+  steps: string[];
   onClose: () => void;
   onDraftChange: (value: string) => void;
   onSend: () => void;
@@ -28,6 +29,7 @@ export function MeetingDetailModal({
   messages,
   draft,
   asking,
+  steps,
   onClose,
   onDraftChange,
   onSend,
@@ -98,6 +100,7 @@ export function MeetingDetailModal({
             messages={messages}
             draft={draft}
             asking={asking}
+            steps={steps}
             onDraftChange={onDraftChange}
             onSend={onSend}
           />

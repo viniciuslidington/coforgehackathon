@@ -3,10 +3,15 @@
 import { useEffect, useState } from 'react';
 import type { MeetingPeriod, MeetingSummaryPage } from '@/entities/meeting/model/types';
 import { getMeetingSummaries, syncMeetings } from '@/shared/api/meetings';
-import { CallRow } from '@/entities/call/ui/CallRow';
+import { CallRow } from '@/entities/meeting/ui/CallRow';
 import { useMeetingDetail } from '@/features/call-detail/model/useMeetingDetail';
 import { MeetingDetailModal } from '@/features/call-detail/ui/MeetingDetailModal';
+import { useCallFilters } from '@/features/call-filters/model/useCallFilters';
+import { SortDropdown } from '@/features/call-filters/ui/SortDropdown';
+import { TopicsPicker } from '@/features/call-filters/ui/TopicsPicker';
 import styles from './CallHistory.module.css';
+
+const TOPICS_STORAGE_KEY = 'meeting-topics';
 
 const PERIODS: { label: string; value: MeetingPeriod }[] = [
   { label: 'Today', value: 'day' },
@@ -25,11 +30,41 @@ export function CallHistory() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const meetingDetail = useMeetingDetail();
+  const [topics, setTopics] = useState<string[]>([]);
+  const { sort, selectSort } = useCallFilters();
+
+  // Deliberately not a lazy useState initializer: this component renders on
+  // the server first (no `window`), so restoring from localStorage has to
+  // happen post-mount to avoid a hydration mismatch between the server's
+  // empty render and the client's real stored value.
+  useEffect(() => {
+    const restoreTopics = window.setTimeout(() => {
+      try {
+        const saved = window.localStorage.getItem(TOPICS_STORAGE_KEY);
+        if (saved) setTopics(JSON.parse(saved) as string[]);
+      } catch {
+        // Storage may be unavailable (e.g. Safari private mode), or hold a
+        // stale/invalid value — either way, just keep the empty default.
+      }
+    }, 0);
+    return () => window.clearTimeout(restoreTopics);
+  }, []);
+
+  const applyTopics = (next: string[]) => {
+    setLoading(true);
+    setPage(1);
+    setTopics(next);
+    try {
+      window.localStorage.setItem(TOPICS_STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      // Storage may be unavailable (e.g. Safari private mode) — just skip persisting.
+    }
+  };
 
   useEffect(() => {
     const controller = new AbortController();
     let active = true;
-    getMeetingSummaries(period, page, pageSize, controller.signal)
+    getMeetingSummaries(period, page, pageSize, topics, sort, controller.signal)
       .then((result) => {
         if (active) setData(result);
       })
@@ -45,7 +80,7 @@ export function CallHistory() {
       active = false;
       controller.abort();
     };
-  }, [page, pageSize, period]);
+  }, [page, pageSize, period, topics, sort]);
 
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -72,7 +107,7 @@ export function CallHistory() {
       setPage(1);
       // Changing the page alone does not retrigger the request when already
       // on page one, so reload the current result explicitly after syncing.
-      const refreshed = await getMeetingSummaries(period, 1, pageSize);
+      const refreshed = await getMeetingSummaries(period, 1, pageSize, topics, sort);
       setData(refreshed);
     } catch (syncError: unknown) {
       setError(syncError instanceof Error ? syncError.message : 'Could not sync meetings.');
@@ -93,6 +128,8 @@ export function CallHistory() {
           <button className={styles.syncButton} onClick={handleSync} disabled={syncing}>
             {syncing ? 'Syncing…' : 'Get more meetings'}
           </button>
+          <TopicsPicker topics={topics} onChange={applyTopics} />
+          <SortDropdown sort={sort} onSelect={selectSort} />
           <div className={styles.periods} aria-label="Date range">
             {PERIODS.map(({ label, value }) => (
               <button key={value} className={`${styles.period} ${period === value ? styles.active : ''}`} onClick={() => selectPeriod(value)}>
@@ -116,12 +153,13 @@ export function CallHistory() {
         <div>PARTICIPANTS</div>
         <div>AI SUMMARY</div>
         <div>KEYWORDS</div>
+        <div>PRIORITY</div>
       </div>
 
       <div className={styles.rows} aria-live="polite">
         {error && <p className={styles.message}>{error} Check that the Meeting Insights API is running.</p>}
         {!error && !loading && data?.items.length === 0 && <p className={styles.message}>No meetings found for this date range.</p>}
-        {data?.items.map((meeting) => (
+        {(data?.items ?? []).map((meeting) => (
           <CallRow key={meeting.meeting_id} meeting={meeting} onOpen={meetingDetail.openMeeting} />
         ))}
       </div>
@@ -143,6 +181,7 @@ export function CallHistory() {
           messages={meetingDetail.messages}
           draft={meetingDetail.draft}
           asking={meetingDetail.asking}
+          steps={meetingDetail.steps}
           onClose={meetingDetail.closeMeeting}
           onDraftChange={meetingDetail.setDraft}
           onSend={meetingDetail.sendMessage}

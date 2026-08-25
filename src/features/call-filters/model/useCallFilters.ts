@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import type { SortKey } from '@/entities/call/model/types';
+import type { SortKey } from '@/entities/meeting/model/types';
 
 const DEFAULT_PERIOD = 480; // Shift
 const DEFAULT_SORT: SortKey = 'priority';

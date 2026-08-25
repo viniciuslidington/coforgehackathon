@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "api": "cd resume-ai-service && env -u VIRTUAL_ENV uv sync && .venv/bin/python -m uvicorn app.main:app --reload",
+    "all": "concurrently -n \"web,api\" -c \"bgBlue.bold,bgMagenta.bold\" \"npm:dev\" \"npm:api\"",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
@@ -18,6 +19,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^10.0.5",
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
     "typescript": "^5"

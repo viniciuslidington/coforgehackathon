@@ -1,6 +1,6 @@
 .row {
   display: grid;
-  grid-template-columns: 110px 70px minmax(150px, 0.75fr) minmax(130px, 0.8fr) minmax(220px, 1.4fr) minmax(180px, 0.9fr);
+  grid-template-columns: 110px 70px minmax(150px, 0.75fr) minmax(130px, 0.8fr) minmax(220px, 1.4fr) minmax(180px, 0.9fr) minmax(90px, 100px);
   gap: 12px;
   padding: 13px 16px;
   border-bottom: 1px solid var(--border-0);
@@ -86,4 +86,8 @@
 .emptyKeyword {
   color: var(--text-dimmest);
   background: transparent;
+}
+
+.priority {
+  min-width: 96px;
 }

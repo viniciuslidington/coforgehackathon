@@ -6,17 +6,27 @@ transcript, and per-meeting Q&A, all backed by what's stored in the database.
 from __future__ import annotations
 
 import logging
+import json
 from datetime import date
-from typing import Literal
+from typing import Iterator, Literal
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import StreamingResponse
+from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.runnables import RunnableConfig
 
 from app.core.vtt import duration_seconds, parse_vtt, participants_from_captions, transcript_from_captions
-from app.schemas.agent import MeetingResponse, QuestionRequest
+from app.graphs.meeting_chat.graph import chat_graph
+from app.graphs.meeting_chat.prompts import (
+    INITIAL_STEP_LABEL,
+    SYNTHESIS_STEP_LABEL,
+    TOOL_STEP_LABELS,
+)
+from app.schemas.agent import AnswerEvent, ErrorEvent, QuestionRequest, StepEvent
 from app.schemas.meetings import RefreshResponse, SummaryPage
 from app.schemas.transcripts import TranscriptSegment
-from app.services.database import delete_summary, summary_exists, summary_has_keywords, upsert_summary
-from app.services.meeting_service import caption_to_segment, execute_chat, execute_overview, get_stored_summaries
+from app.services.database import delete_summary, get_summary, summary_exists, summary_has_keywords, upsert_summary
+from app.services.meeting_service import caption_to_segment, compute_topic_embedding_blob, execute_overview, get_stored_summaries
 from app.services.r2_storage import get_r2_vtt_content, list_r2_vtt_files
 from app.services.transcripts import transcript_repository
 
@@ -61,7 +71,8 @@ def _sync_from_r2(*, limit: int | None) -> RefreshResponse:
         title, simple_summary, keywords = execute_overview(transcript)
         participants = participants_from_captions(captions)
         duration = duration_seconds(captions)
-        upsert_summary(meeting_id=meeting_id, title=title, meeting_date=date.today().isoformat(), participants=participants, simple_summary=simple_summary, keywords=keywords, duration_seconds=duration)
+        topic_embedding = compute_topic_embedding_blob(f"{title} {simple_summary} {' '.join(keywords)}")
+        upsert_summary(meeting_id=meeting_id, title=title, meeting_date=date.today().isoformat(), participants=participants, simple_summary=simple_summary, keywords=keywords, duration_seconds=duration, topic_embedding=topic_embedding)
         processed += 1
         logger.info(
             "Stored meeting %s: title=%r participants=%s duration_seconds=%d keywords=%s",
@@ -98,9 +109,21 @@ def remove_meeting_summary(meeting_id: str) -> dict[str, str]:
     return {"status": "success", "message": f"Meeting '{meeting_id}' deleted successfully."}
 
 @router.get("/meeting-summaries", response_model=SummaryPage)
-def get_meeting_summaries(page: int = Query(1, ge=1), page_size: int = Query(15, ge=1, le=100), period: Literal["day", "week", "30d", "all"] = "all") -> SummaryPage:
-    """Return persisted meeting overviews, filtered by meeting date and paginated."""
-    return get_stored_summaries(page, page_size, period)
+def get_meeting_summaries(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(15, ge=1, le=100),
+    period: Literal["day", "week", "30d", "all"] = "all",
+    topics: list[str] | None = Query(None, max_length=10),
+    sort: Literal["priority", "time"] = "priority",
+) -> SummaryPage:
+    """Return persisted meeting overviews, filtered by meeting date and paginated.
+
+    When `topics` is given, each item also carries `priority_score`/`priority_tier`.
+    `sort` controls ordering: "priority" orders by relevance to those topics
+    (computed deterministically, no LLM); "time" orders by meeting date
+    regardless of whether topics are active.
+    """
+    return get_stored_summaries(page, page_size, period, topics, sort)
 
 @router.get("/meeting-summaries/{meeting_id}/transcript", response_model=list[TranscriptSegment])
 def get_meeting_transcript(meeting_id: str) -> list[TranscriptSegment]:
@@ -110,11 +133,91 @@ def get_meeting_transcript(meeting_id: str) -> list[TranscriptSegment]:
         raise HTTPException(status_code=404, detail=f"No transcript found for meeting '{meeting_id}'.")
     return [caption_to_segment(caption) for caption in captions]
 
-@router.post("/meeting-summaries/{meeting_id}/questions", response_model=MeetingResponse)
-def ask_meeting_question(meeting_id: str, request: QuestionRequest) -> MeetingResponse:
-    """Answer one question grounded in a stored meeting's full transcript."""
+def _sse(event: StepEvent | AnswerEvent | ErrorEvent) -> str:
+    return f"data: {json.dumps(event.model_dump(), ensure_ascii=False)}\n\n"
+
+
+def _message_text(message: AIMessage) -> str:
+    if isinstance(message.content, str):
+        return message.content
+    pieces = [
+        str(part.get("text", ""))
+        for part in message.content
+        if isinstance(part, dict) and part.get("type") == "text"
+    ]
+    return "".join(pieces)
+
+
+@router.post("/meeting-summaries/{meeting_id}/questions")
+def ask_meeting_question(meeting_id: str, request: QuestionRequest) -> StreamingResponse:
+    """Stream an agent answer grounded in one stored meeting and its chat session."""
     captions = transcript_repository.get_captions(meeting_id)
     if captions is None:
         raise HTTPException(status_code=404, detail=f"No transcript found for meeting '{meeting_id}'.")
     transcript = transcript_from_captions(captions)
-    return MeetingResponse(result=execute_chat(transcript, request.question), caption_count=len(captions))
+    summary = get_summary(meeting_id) or {}
+    metadata = {
+        "meeting_id": meeting_id,
+        "title": summary.get("title"),
+        "date": summary.get("meeting_date"),
+        "participants": [
+            item.strip()
+            for item in str(summary.get("participants", "")).split(",")
+            if item.strip()
+        ] or participants_from_captions(captions),
+        "duration_seconds": summary.get("duration_seconds", duration_seconds(captions)),
+        "keywords": [
+            item.strip()
+            for item in str(summary.get("keywords", "")).split(",")
+            if item.strip()
+        ],
+    }
+    graph_input = {
+        "meeting_id": meeting_id,
+        "transcript": transcript,
+        "captions": [
+            {"start": caption.start, "end": caption.end, "text": caption.text}
+            for caption in captions
+        ],
+        "metadata": metadata,
+        "messages": [HumanMessage(content=request.question)],
+    }
+    config: RunnableConfig = {"configurable": {"thread_id": request.session_id}}
+
+    def event_stream() -> Iterator[str]:
+        yield _sse(StepEvent(label=INITIAL_STEP_LABEL))
+        try:
+            for update in chat_graph.stream(graph_input, config=config, stream_mode="updates"):
+                agent_update = update.get("agent")
+                if agent_update:
+                    for message in agent_update.get("messages", []):
+                        if not isinstance(message, AIMessage):
+                            continue
+                        if message.tool_calls:
+                            for tool_call in message.tool_calls:
+                                tool_name = tool_call.get("name", "")
+                                label = TOOL_STEP_LABELS.get(tool_name, "Consultando uma ferramenta…")
+                                yield _sse(StepEvent(label=label))
+                        else:
+                            yield _sse(StepEvent(label=SYNTHESIS_STEP_LABEL))
+                synthesis_update = update.get("synthesize")
+                if synthesis_update:
+                    for message in synthesis_update.get("messages", []):
+                        if isinstance(message, AIMessage):
+                            yield _sse(AnswerEvent(
+                                text=_message_text(message),
+                                caption_count=len(captions),
+                            ))
+        except Exception as exc:
+            logger.exception("Meeting chat stream failed for meeting=%s", meeting_id)
+            detail = str(exc) if isinstance(exc, RuntimeError) else "Não foi possível concluir a resposta."
+            yield _sse(ErrorEvent(detail=detail))
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )

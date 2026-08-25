@@ -11,7 +11,15 @@ dependencies = [
     "python-multipart>=0.0.12",
     "python-dotenv>=1.0.1",
     "boto3>=1.43.78",
+    "fastembed>=0.8.0",
+    "langgraph-checkpoint-sqlite>=3.1.1",
+    "httpx>=0.28.1",
 ]
 
 [tool.uv]
 package = false
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]

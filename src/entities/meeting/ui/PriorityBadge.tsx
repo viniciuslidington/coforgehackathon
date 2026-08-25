@@ -26,10 +26,7 @@ export function PriorityBadge({ tier, score }: PriorityBadgeProps) {
         </span>
       </div>
       <div className={styles.track}>
-        <div
-          className={styles.fill}
-          style={{ width: `${score}%`, background: color }}
-        />
+        <div className={styles.fill} style={{ width: `${score}%`, background: color }} />
       </div>
     </div>
   );
