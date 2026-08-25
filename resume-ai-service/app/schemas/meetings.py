@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel
 
 class StoredMeetingSummary(BaseModel):
@@ -11,6 +13,8 @@ class StoredMeetingSummary(BaseModel):
     keywords: list[str]
     duration_seconds: int
     refreshed_at: str
+    priority_score: float | None = None
+    priority_tier: Literal["urgent", "high", "normal"] | None = None
 
 class SummaryPage(BaseModel):
     items: list[StoredMeetingSummary]

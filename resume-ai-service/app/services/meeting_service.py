@@ -19,7 +19,8 @@ from app.graphs.summary.graph import generate_meeting_overview, generate_summary
 from app.graphs.summary.state import Mode
 from app.schemas.meetings import StoredMeetingSummary, SummaryPage
 from app.schemas.transcripts import TranscriptSegment
-from app.services.database import list_summaries
+from app.services import priority
+from app.services.database import list_summaries, list_summaries_for_priority
 
 logger = logging.getLogger("meeting-insights")
 
@@ -79,20 +80,47 @@ def execute_overview(transcript: str) -> tuple[str, str, list[str]]:
         )
         raise_openrouter_failure(exc)
 
-def get_stored_summaries(page: int, page_size: int, period: Literal["day", "week", "30d", "all"] = "all") -> SummaryPage:
+def compute_topic_embedding_blob(text: str) -> bytes:
+    return priority.vector_to_blob(priority.embed_passage(text))
+
+def _row_to_summary(row: dict[str, object], *, priority_score: float | None = None, priority_tier: str | None = None) -> StoredMeetingSummary:
+    data = dict(row)
+    data.pop("topic_embedding", None)
+    data["participants"] = [name.strip() for name in data["participants"].split(",") if name.strip()]
+    data["keywords"] = [keyword.strip() for keyword in data["keywords"].split(",") if keyword.strip()]
+    return StoredMeetingSummary(**data, priority_score=priority_score, priority_tier=priority_tier)
+
+def get_stored_summaries(page: int, page_size: int, period: Literal["day", "week", "30d", "all"] = "all", topics: list[str] | None = None) -> SummaryPage:
     date_from = {
         "day": date.today().isoformat(),
         "week": (date.today() - timedelta(days=6)).isoformat(),
         "30d": (date.today() - timedelta(days=29)).isoformat(),
         "all": None,
     }[period]
-    rows, total = list_summaries(offset=(page - 1) * page_size, limit=page_size, date_from=date_from)
-    items = []
-    for row in rows:
-        data = dict(row)
-        data["participants"] = [name.strip() for name in data["participants"].split(",") if name.strip()]
-        data["keywords"] = [keyword.strip() for keyword in data["keywords"].split(",") if keyword.strip()]
-        items.append(StoredMeetingSummary(**data))
+
+    if not topics:
+        rows, total = list_summaries(offset=(page - 1) * page_size, limit=page_size, date_from=date_from)
+        items = [_row_to_summary(row) for row in rows]
+        return SummaryPage(items=items, total=total, page=page, page_size=page_size)
+
+    topic_vectors = [priority.embed_topic(topic) for topic in topics]
+    all_rows = list_summaries_for_priority(date_from=date_from)
+    scored: list[tuple[float | None, str | None, dict[str, object]]] = []
+    for row in all_rows:
+        blob = row.get("topic_embedding")
+        if blob:
+            meeting_vector = priority.blob_to_vector(blob)
+            score = priority.score_meeting(meeting_vector, topic_vectors)
+            tier = priority.tier_for_score(score)
+        else:
+            score, tier = None, None
+        scored.append((score, tier, row))
+    scored.sort(key=lambda entry: entry[0] if entry[0] is not None else -1.0, reverse=True)
+
+    total = len(scored)
+    start = (page - 1) * page_size
+    page_slice = scored[start:start + page_size]
+    items = [_row_to_summary(row, priority_score=score, priority_tier=tier) for score, tier, row in page_slice]
     return SummaryPage(items=items, total=total, page=page, page_size=page_size)
 
 def caption_to_segment(caption: Caption) -> TranscriptSegment:
