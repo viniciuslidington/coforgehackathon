@@ -1,0 +1,80 @@
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border-4);
+  border-radius: 9px;
+  background: var(--bg-7);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.trigger:hover { border-color: var(--border-6); color: var(--text-primary); }
+.triggerOpen { border-color: var(--teal-border-l); color: var(--text-primary); }
+
+.triggerLabel {
+  white-space: nowrap;
+}
+
+.chevron {
+  font-size: 9px;
+  color: var(--text-dimmer);
+}
+
+.input {
+  width: 100%;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--border-4);
+  border-radius: 6px;
+  background: var(--bg-2);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--teal-border-l);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 4px 3px 7px;
+  border: 1px solid var(--border-4);
+  border-radius: 7px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-tertiary);
+}
+
+.chipRemove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-dimmer);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.chipRemove:hover {
+  background: var(--urgent-bg);
+  color: var(--urgent);
+}

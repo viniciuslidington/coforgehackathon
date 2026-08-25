@@ -153,15 +153,6 @@
 }
 .pagination button:disabled { cursor: not-allowed; color: var(--text-ghost); }
 
-.topicsInput {
-  background: var(--bg-2);
-  border: 1px solid var(--border-4);
-  border-radius: 4px;
-  padding: 6px 10px;
-  color: inherit;
-  font-size: 13px;
-}
-
 /* Custom scrollbar */
 .rows::-webkit-scrollbar {
   width: 10px;

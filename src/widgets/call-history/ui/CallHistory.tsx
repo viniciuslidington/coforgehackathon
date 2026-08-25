@@ -7,7 +7,11 @@ import { CallRow } from '@/entities/meeting/ui/CallRow';
 import { useMeetingDetail } from '@/features/call-detail/model/useMeetingDetail';
 import { MeetingDetailModal } from '@/features/call-detail/ui/MeetingDetailModal';
 import { useCallFilters } from '@/features/call-filters/model/useCallFilters';
+import { SortDropdown } from '@/features/call-filters/ui/SortDropdown';
+import { TopicsPicker } from '@/features/call-filters/ui/TopicsPicker';
 import styles from './CallHistory.module.css';
+
+const TOPICS_STORAGE_KEY = 'meeting-topics';
 
 const PERIODS: { label: string; value: MeetingPeriod }[] = [
   { label: 'Today', value: 'day' },
@@ -26,36 +30,29 @@ export function CallHistory() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const meetingDetail = useMeetingDetail();
-  const [topicsInput, setTopicsInput] = useState('');
-  const [debouncedTopicsInput, setDebouncedTopicsInput] = useState('');
+  const [topics, setTopics] = useState<string[]>([]);
   const { sort, selectSort } = useCallFilters();
 
+  // Deliberately not a lazy useState initializer: this component renders on
+  // the server first (no `window`), so restoring from localStorage has to
+  // happen post-mount to avoid a hydration mismatch between the server's
+  // empty render and the client's real stored value.
   useEffect(() => {
     try {
-      const saved = window.localStorage.getItem('meeting-topics');
-      if (saved) setTopicsInput(saved);
+      const saved = window.localStorage.getItem(TOPICS_STORAGE_KEY);
+      if (saved) setTopics(JSON.parse(saved) as string[]);
     } catch {
-      // Storage may be unavailable (e.g. Safari private mode) — just skip restoring.
+      // Storage may be unavailable (e.g. Safari private mode), or hold a
+      // stale/invalid value — either way, just keep the empty default.
     }
   }, []);
 
-  // Debounce the value that actually drives the fetch, so we don't fire a
-  // request (and a real ONNX embedding inference) on every keystroke.
-  useEffect(() => {
-    const timeout = setTimeout(() => setDebouncedTopicsInput(topicsInput), 300);
-    return () => clearTimeout(timeout);
-  }, [topicsInput]);
-
-  const topics = debouncedTopicsInput.split(',').map((t) => t.trim()).filter(Boolean);
-
-  const applyTopics = (value: string) => {
-    if (value !== topicsInput) {
-      setLoading(true);
-      setPage(1);
-    }
-    setTopicsInput(value);
+  const applyTopics = (next: string[]) => {
+    setLoading(true);
+    setPage(1);
+    setTopics(next);
     try {
-      window.localStorage.setItem('meeting-topics', value);
+      window.localStorage.setItem(TOPICS_STORAGE_KEY, JSON.stringify(next));
     } catch {
       // Storage may be unavailable (e.g. Safari private mode) — just skip persisting.
     }
@@ -80,8 +77,7 @@ export function CallHistory() {
       active = false;
       controller.abort();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, pageSize, period, debouncedTopicsInput, sort]);
+  }, [page, pageSize, period, topics, sort]);
 
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -129,20 +125,8 @@ export function CallHistory() {
           <button className={styles.syncButton} onClick={handleSync} disabled={syncing}>
             {syncing ? 'Syncing…' : 'Get more meetings'}
           </button>
-          <input
-            className={styles.topicsInput}
-            placeholder="Topics (comma-separated)"
-            value={topicsInput}
-            onChange={(event) => applyTopics(event.target.value)}
-          />
-          <select
-            aria-label="Sort by"
-            value={sort}
-            onChange={(event) => selectSort(event.target.value as typeof sort)}
-          >
-            <option value="time">Most recent</option>
-            <option value="priority">Priority</option>
-          </select>
+          <TopicsPicker topics={topics} onChange={applyTopics} />
+          <SortDropdown sort={sort} onSelect={selectSort} />
           <div className={styles.periods} aria-label="Date range">
             {PERIODS.map(({ label, value }) => (
               <button key={value} className={`${styles.period} ${period === value ? styles.active : ''}`} onClick={() => selectPeriod(value)}>
