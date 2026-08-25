@@ -1,6 +1,7 @@
 'use client';
 
-import type { MeetingSummary } from '@/entities/meeting/model/types';
+import type { MeetingSummary } from '../model/types';
+import { PriorityBadge } from './PriorityBadge';
 import styles from './CallRow.module.css';
 
 interface CallRowProps {
@@ -41,6 +42,12 @@ export function CallRow({ meeting, onOpen }: CallRowProps) {
           <span key={keyword} className={styles.keyword}>{keyword}</span>
         )) : <span className={styles.emptyKeyword}>No keywords yet</span>}
       </div>
+
+      {meeting.priority_tier && meeting.priority_score != null && (
+        <div className={styles.priority}>
+          <PriorityBadge tier={meeting.priority_tier} score={meeting.priority_score} />
+        </div>
+      )}
     </article>
   );
 }

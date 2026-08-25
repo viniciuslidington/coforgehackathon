@@ -87,3 +87,7 @@
   color: var(--text-dimmest);
   background: transparent;
 }
+
+.priority {
+  min-width: 96px;
+}

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { MeetingPeriod, MeetingSummaryPage } from '@/entities/meeting/model/types';
 import { getMeetingSummaries, syncMeetings } from '@/shared/api/meetings';
-import { CallRow } from '@/entities/call/ui/CallRow';
+import { CallRow } from '@/entities/meeting/ui/CallRow';
 import { useMeetingDetail } from '@/features/call-detail/model/useMeetingDetail';
 import { MeetingDetailModal } from '@/features/call-detail/ui/MeetingDetailModal';
 import styles from './CallHistory.module.css';
