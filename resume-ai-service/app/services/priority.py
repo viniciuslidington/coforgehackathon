@@ -1,0 +1,75 @@
+# resume-ai-service/app/services/priority.py
+"""Deterministic, non-generative topic-relevance scoring for meetings.
+
+The only module in this service that knows a local embedding model exists.
+Everything downstream (database.py, meeting_service.py) works with plain
+float vectors and never imports fastembed directly.
+"""
+from __future__ import annotations
+
+from typing import Literal
+
+import numpy as np
+from fastembed import TextEmbedding
+
+MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+
+URGENT_THRESHOLD = 70.0
+HIGH_THRESHOLD = 40.0
+
+_model: TextEmbedding | None = None
+_topic_cache: dict[str, np.ndarray] = {}
+
+
+def _get_model() -> TextEmbedding:
+    global _model
+    if _model is None:
+        _model = TextEmbedding(MODEL_NAME)
+    return _model
+
+
+def embed_passage(text: str) -> np.ndarray:
+    """Embed meeting-side text (title + simple_summary + keywords)."""
+    (vector,) = _get_model().embed([f"passage: {text}"])
+    return vector
+
+
+def embed_topic(topic: str) -> np.ndarray:
+    """Embed a user-supplied topic, cached by normalized text."""
+    key = topic.strip().lower()
+    if key not in _topic_cache:
+        (vector,) = _get_model().embed([f"query: {topic}"])
+        _topic_cache[key] = vector
+    return _topic_cache[key]
+
+
+def vector_to_blob(vector: np.ndarray) -> bytes:
+    return vector.astype(np.float32).tobytes()
+
+
+def blob_to_vector(blob: bytes) -> np.ndarray:
+    return np.frombuffer(blob, dtype=np.float32)
+
+
+def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
+    denom = float(np.linalg.norm(a) * np.linalg.norm(b))
+    if denom == 0.0:
+        return 0.0
+    return float(np.dot(a, b) / denom)
+
+
+def score_meeting(meeting_vector: np.ndarray, topic_vectors: list[np.ndarray]) -> float:
+    """0-100 relevance score: the MAX cosine similarity across all topics."""
+    if not topic_vectors:
+        return 0.0
+    best_cosine = max(cosine_similarity(meeting_vector, topic_vector) for topic_vector in topic_vectors)
+    clamped = max(-1.0, min(1.0, best_cosine))
+    return (clamped + 1.0) / 2.0 * 100.0
+
+
+def tier_for_score(score: float) -> Literal["urgent", "high", "normal"]:
+    if score >= URGENT_THRESHOLD:
+        return "urgent"
+    if score >= HIGH_THRESHOLD:
+        return "high"
+    return "normal"
