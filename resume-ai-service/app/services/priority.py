@@ -7,6 +7,7 @@ float vectors and never imports fastembed directly.
 """
 from __future__ import annotations
 
+import warnings
 from typing import Literal
 
 import numpy as np
@@ -24,7 +25,19 @@ _topic_cache: dict[str, np.ndarray] = {}
 def _get_model() -> TextEmbedding:
     global _model
     if _model is None:
-        _model = TextEmbedding(MODEL_NAME)
+        with warnings.catch_warnings():
+            # fastembed emits a UserWarning about mean-pooling vs. CLS pooling
+            # when loading this model. The warning text itself names concrete
+            # mitigations (pin fastembed==0.5.1, or add_custom_model), but
+            # since we can't control the installed fastembed version here,
+            # narrowly suppress just this message at the model-load call site
+            # rather than masking UserWarnings process-wide.
+            warnings.filterwarnings(
+                "ignore",
+                message=r".*mean pooling.*",
+                category=UserWarning,
+            )
+            _model = TextEmbedding(MODEL_NAME)
     return _model
 
 
