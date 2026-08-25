@@ -4,8 +4,10 @@ import { useEffect, useState } from 'react';
 import type { MeetingPeriod, MeetingSummaryPage } from '@/entities/meeting/model/types';
 import { getMeetingSummaries, syncMeetings } from '@/shared/api/meetings';
 import { CallRow } from '@/entities/meeting/ui/CallRow';
+import { sortMeetings } from '@/entities/meeting/lib/helpers';
 import { useMeetingDetail } from '@/features/call-detail/model/useMeetingDetail';
 import { MeetingDetailModal } from '@/features/call-detail/ui/MeetingDetailModal';
+import { useCallFilters } from '@/features/call-filters/model/useCallFilters';
 import styles from './CallHistory.module.css';
 
 const PERIODS: { label: string; value: MeetingPeriod }[] = [
@@ -25,11 +27,25 @@ export function CallHistory() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const meetingDetail = useMeetingDetail();
+  const [topicsInput, setTopicsInput] = useState('');
+  const { sort, selectSort } = useCallFilters();
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem('meeting-topics');
+    if (saved) setTopicsInput(saved);
+  }, []);
+
+  const topics = topicsInput.split(',').map((t) => t.trim()).filter(Boolean);
+
+  const applyTopics = (value: string) => {
+    setTopicsInput(value);
+    window.localStorage.setItem('meeting-topics', value);
+  };
 
   useEffect(() => {
     const controller = new AbortController();
     let active = true;
-    getMeetingSummaries(period, page, pageSize, controller.signal)
+    getMeetingSummaries(period, page, pageSize, topics, controller.signal)
       .then((result) => {
         if (active) setData(result);
       })
@@ -45,7 +61,8 @@ export function CallHistory() {
       active = false;
       controller.abort();
     };
-  }, [page, pageSize, period]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, pageSize, period, topicsInput]);
 
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -93,6 +110,20 @@ export function CallHistory() {
           <button className={styles.syncButton} onClick={handleSync} disabled={syncing}>
             {syncing ? 'Syncing…' : 'Get more meetings'}
           </button>
+          <input
+            className={styles.topicsInput}
+            placeholder="Topics (comma-separated)"
+            value={topicsInput}
+            onChange={(event) => applyTopics(event.target.value)}
+          />
+          <select
+            aria-label="Sort by"
+            value={sort}
+            onChange={(event) => selectSort(event.target.value as typeof sort)}
+          >
+            <option value="time">Most recent</option>
+            <option value="priority">Priority</option>
+          </select>
           <div className={styles.periods} aria-label="Date range">
             {PERIODS.map(({ label, value }) => (
               <button key={value} className={`${styles.period} ${period === value ? styles.active : ''}`} onClick={() => selectPeriod(value)}>
@@ -121,7 +152,7 @@ export function CallHistory() {
       <div className={styles.rows} aria-live="polite">
         {error && <p className={styles.message}>{error} Check that the Meeting Insights API is running.</p>}
         {!error && !loading && data?.items.length === 0 && <p className={styles.message}>No meetings found for this date range.</p>}
-        {data?.items.map((meeting) => (
+        {(data ? sortMeetings(data.items, sort) : []).map((meeting) => (
           <CallRow key={meeting.meeting_id} meeting={meeting} onOpen={meetingDetail.openMeeting} />
         ))}
       </div>

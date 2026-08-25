@@ -13,9 +13,13 @@ export async function getMeetingSummaries(
   period: MeetingPeriod,
   page: number,
   pageSize: number,
+  topics: string[] = [],
   signal?: AbortSignal,
 ): Promise<MeetingSummaryPage> {
   const params = new URLSearchParams({ period, page: String(page), page_size: String(pageSize) });
+  for (const topic of topics) {
+    if (topic.trim()) params.append('topics', topic.trim());
+  }
   const response = await fetch(`${API_BASE_URL}/meeting-summaries?${params}`, { signal });
   if (!response.ok) {
     throw new Error(`Could not load meetings (${response.status}).`);
