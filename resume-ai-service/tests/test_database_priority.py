@@ -36,6 +36,25 @@ def test_list_summaries_for_priority_ignores_pagination(db_path):
     assert all(row["topic_embedding"] == b"\x01\x02\x03\x04" for row in rows)
 
 
+def test_upsert_summary_preserves_existing_embedding_when_omitted_on_conflict(db_path):
+    blob = b"\x00\x01\x02\x03"
+    database.upsert_summary(
+        meeting_id="m1", title="Budget sync", meeting_date="2026-08-24",
+        participants=["Ana"], simple_summary="Budget review", keywords=["budget"],
+        duration_seconds=120, topic_embedding=blob,
+    )
+    # Re-upsert the SAME meeting_id (conflict path) without recomputing the
+    # embedding — this must NOT wipe the previously stored blob.
+    database.upsert_summary(
+        meeting_id="m1", title="Budget sync (updated)", meeting_date="2026-08-24",
+        participants=["Ana"], simple_summary="Budget review updated", keywords=["budget"],
+        duration_seconds=130,
+    )
+    rows, _ = database.list_summaries(offset=0, limit=10)
+    assert rows[0]["topic_embedding"] == blob
+    assert rows[0]["title"] == "Budget sync (updated)"
+
+
 def test_list_summaries_for_priority_applies_date_filter(db_path):
     database.upsert_summary(
         meeting_id="old", title="Old", meeting_date="2020-01-01",

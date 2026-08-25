@@ -59,7 +59,7 @@ def upsert_summary(*, meeting_id: str, title: str, meeting_date: str, participan
                 keywords=excluded.keywords,
                 duration_seconds=excluded.duration_seconds,
                 refreshed_at=excluded.refreshed_at,
-                topic_embedding=excluded.topic_embedding
+                topic_embedding=COALESCE(excluded.topic_embedding, meeting_summaries.topic_embedding)
         """, (meeting_id, title, meeting_date, ", ".join(participants), simple_summary, ", ".join(keywords), duration_seconds, datetime.now(UTC).isoformat(), topic_embedding))
 
 def summary_exists(meeting_id: str) -> bool:

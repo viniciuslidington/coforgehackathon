@@ -99,14 +99,21 @@ def remove_meeting_summary(meeting_id: str) -> dict[str, str]:
     return {"status": "success", "message": f"Meeting '{meeting_id}' deleted successfully."}
 
 @router.get("/meeting-summaries", response_model=SummaryPage)
-def get_meeting_summaries(page: int = Query(1, ge=1), page_size: int = Query(15, ge=1, le=100), period: Literal["day", "week", "30d", "all"] = "all", topics: list[str] | None = Query(None)) -> SummaryPage:
+def get_meeting_summaries(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(15, ge=1, le=100),
+    period: Literal["day", "week", "30d", "all"] = "all",
+    topics: list[str] | None = Query(None, max_length=10),
+    sort: Literal["priority", "time"] = "priority",
+) -> SummaryPage:
     """Return persisted meeting overviews, filtered by meeting date and paginated.
 
-    When `topics` is given, each item also carries `priority_score`/`priority_tier`
-    and the page is ordered by relevance to those topics (computed deterministically,
-    no LLM) instead of by date.
+    When `topics` is given, each item also carries `priority_score`/`priority_tier`.
+    `sort` controls ordering: "priority" orders by relevance to those topics
+    (computed deterministically, no LLM); "time" orders by meeting date
+    regardless of whether topics are active.
     """
-    return get_stored_summaries(page, page_size, period, topics)
+    return get_stored_summaries(page, page_size, period, topics, sort)
 
 @router.get("/meeting-summaries/{meeting_id}/transcript", response_model=list[TranscriptSegment])
 def get_meeting_transcript(meeting_id: str) -> list[TranscriptSegment]:

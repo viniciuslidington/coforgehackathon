@@ -90,13 +90,33 @@ def _row_to_summary(row: dict[str, object], *, priority_score: float | None = No
     data["keywords"] = [keyword.strip() for keyword in data["keywords"].split(",") if keyword.strip()]
     return StoredMeetingSummary(**data, priority_score=priority_score, priority_tier=priority_tier)
 
-def get_stored_summaries(page: int, page_size: int, period: Literal["day", "week", "30d", "all"] = "all", topics: list[str] | None = None) -> SummaryPage:
+MAX_TOPIC_LENGTH = 200
+
+
+def _normalize_topics(topics: list[str] | None) -> list[str]:
+    """Drop blank/whitespace-only topics and bound each topic's length.
+
+    Truncating (rather than rejecting) long topics keeps the endpoint
+    permissive while still bounding worst-case embedding-cache growth.
+    """
+    return [t.strip()[:MAX_TOPIC_LENGTH] for t in (topics or []) if t.strip()]
+
+
+def get_stored_summaries(
+    page: int,
+    page_size: int,
+    period: Literal["day", "week", "30d", "all"] = "all",
+    topics: list[str] | None = None,
+    sort: Literal["priority", "time"] = "priority",
+) -> SummaryPage:
     date_from = {
         "day": date.today().isoformat(),
         "week": (date.today() - timedelta(days=6)).isoformat(),
         "30d": (date.today() - timedelta(days=29)).isoformat(),
         "all": None,
     }[period]
+
+    topics = _normalize_topics(topics)
 
     if not topics:
         rows, total = list_summaries(offset=(page - 1) * page_size, limit=page_size, date_from=date_from)
@@ -110,12 +130,27 @@ def get_stored_summaries(page: int, page_size: int, period: Literal["day", "week
         blob = row.get("topic_embedding")
         if blob:
             meeting_vector = priority.blob_to_vector(blob)
-            score = priority.score_meeting(meeting_vector, topic_vectors)
-            tier = priority.tier_for_score(score)
+            try:
+                score = priority.score_meeting(meeting_vector, topic_vectors)
+            except ValueError:
+                # A stored embedding from a previous, different-dimension
+                # model. Degrade gracefully instead of 500ing the whole page.
+                logger.warning(
+                    "Skipping priority score for %s: stored embedding dimension mismatch",
+                    row.get("meeting_id"),
+                )
+                score, tier = None, None
+            else:
+                tier = priority.tier_for_score(score)
         else:
             score, tier = None, None
         scored.append((score, tier, row))
-    scored.sort(key=lambda entry: entry[0] if entry[0] is not None else -1.0, reverse=True)
+
+    if sort == "priority":
+        scored.sort(key=lambda entry: entry[0] if entry[0] is not None else -1.0, reverse=True)
+    # sort == "time": `all_rows` (and therefore `scored`) is already ordered
+    # by meeting_date DESC, refreshed_at DESC from list_summaries_for_priority,
+    # so no re-sort is needed — every row is still scored above regardless.
 
     total = len(scored)
     start = (page - 1) * page_size
