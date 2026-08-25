@@ -16,7 +16,7 @@ from app.schemas.agent import MeetingResponse, QuestionRequest
 from app.schemas.meetings import RefreshResponse, SummaryPage
 from app.schemas.transcripts import TranscriptSegment
 from app.services.database import delete_summary, summary_exists, summary_has_keywords, upsert_summary
-from app.services.meeting_service import caption_to_segment, execute_chat, execute_overview, get_stored_summaries
+from app.services.meeting_service import caption_to_segment, compute_topic_embedding_blob, execute_chat, execute_overview, get_stored_summaries
 from app.services.r2_storage import get_r2_vtt_content, list_r2_vtt_files
 from app.services.transcripts import transcript_repository
 
@@ -61,7 +61,8 @@ def _sync_from_r2(*, limit: int | None) -> RefreshResponse:
         title, simple_summary, keywords = execute_overview(transcript)
         participants = participants_from_captions(captions)
         duration = duration_seconds(captions)
-        upsert_summary(meeting_id=meeting_id, title=title, meeting_date=date.today().isoformat(), participants=participants, simple_summary=simple_summary, keywords=keywords, duration_seconds=duration)
+        topic_embedding = compute_topic_embedding_blob(f"{title} {simple_summary} {' '.join(keywords)}")
+        upsert_summary(meeting_id=meeting_id, title=title, meeting_date=date.today().isoformat(), participants=participants, simple_summary=simple_summary, keywords=keywords, duration_seconds=duration, topic_embedding=topic_embedding)
         processed += 1
         logger.info(
             "Stored meeting %s: title=%r participants=%s duration_seconds=%d keywords=%s",
@@ -98,9 +99,14 @@ def remove_meeting_summary(meeting_id: str) -> dict[str, str]:
     return {"status": "success", "message": f"Meeting '{meeting_id}' deleted successfully."}
 
 @router.get("/meeting-summaries", response_model=SummaryPage)
-def get_meeting_summaries(page: int = Query(1, ge=1), page_size: int = Query(15, ge=1, le=100), period: Literal["day", "week", "30d", "all"] = "all") -> SummaryPage:
-    """Return persisted meeting overviews, filtered by meeting date and paginated."""
-    return get_stored_summaries(page, page_size, period)
+def get_meeting_summaries(page: int = Query(1, ge=1), page_size: int = Query(15, ge=1, le=100), period: Literal["day", "week", "30d", "all"] = "all", topics: list[str] | None = Query(None)) -> SummaryPage:
+    """Return persisted meeting overviews, filtered by meeting date and paginated.
+
+    When `topics` is given, each item also carries `priority_score`/`priority_tier`
+    and the page is ordered by relevance to those topics (computed deterministically,
+    no LLM) instead of by date.
+    """
+    return get_stored_summaries(page, page_size, period, topics)
 
 @router.get("/meeting-summaries/{meeting_id}/transcript", response_model=list[TranscriptSegment])
 def get_meeting_transcript(meeting_id: str) -> list[TranscriptSegment]:
