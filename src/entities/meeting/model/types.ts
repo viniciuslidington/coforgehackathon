@@ -1,5 +1,9 @@
 export type MeetingPeriod = 'day' | 'week' | '30d' | 'all';
 
+export type Priority = 'urgent' | 'high' | 'normal';
+
+export type SortKey = 'priority' | 'time';
+
 export interface MeetingSummary {
   meeting_id: string;
   title: string;
@@ -9,6 +13,8 @@ export interface MeetingSummary {
   keywords: string[];
   duration_seconds: number;
   refreshed_at: string;
+  priority_score?: number | null;
+  priority_tier?: Priority | null;
 }
 
 export interface MeetingSummaryPage {
