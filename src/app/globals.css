@@ -4,7 +4,7 @@
 
 /* ── CSS Variables (Design Tokens) ─────────────────────────── */
 :root {
-  /* Brand */
+  /* Brand Teal */
   --teal: #016a71;
   --teal-light: #3fb6ba;
   --teal-pale: #78c9cb;
@@ -14,6 +14,17 @@
   --teal-border-l: #0a8b93;
   --teal-text: #eafcfc;
   --teal-glow: #e8fbfb;
+
+  /* Brand Orange / Logo Coral */
+  --brand-orange: #F15B40;
+  --brand-orange-light: #FF7A60;
+  --brand-orange-pale: #FFAB91;
+  --brand-orange-bg: rgba(241, 91, 64, 0.12);
+  --brand-orange-bg-hover: rgba(241, 91, 64, 0.22);
+  --brand-orange-border: rgba(241, 91, 64, 0.35);
+  --brand-orange-border-strong: #F15B40;
+  --brand-orange-text: #FFD9D0;
+  --brand-orange-glow: rgba(241, 91, 64, 0.28);
 
   /* Urgent */
   --urgent: #e2603f;

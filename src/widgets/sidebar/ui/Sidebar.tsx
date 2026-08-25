@@ -1,11 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import styles from './Sidebar.module.css';
 
 interface NavItem {
   id: string;
   label: string;
+  href: string;
   badge?: number;
   icon: (active: boolean) => React.ReactNode;
 }
@@ -14,6 +17,7 @@ const NAV_ITEMS: NavItem[] = [
   {
     id: 'shift',
     label: 'Shift Overview',
+    href: '/',
     icon: (active) => (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? '2.2' : '1.8'} strokeLinecap="round" strokeLinejoin="round">
         <rect width="7" height="9" x="3" y="3" rx="1.5" />
@@ -24,19 +28,9 @@ const NAV_ITEMS: NavItem[] = [
     ),
   },
   {
-    id: 'meetings',
-    label: 'Meeting Summaries',
-    icon: (active) => (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? '2.2' : '1.8'} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-        <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-        <line x1="12" x2="12" y1="19" y2="22" />
-      </svg>
-    ),
-  },
-  {
     id: 'chat',
     label: 'AI Quick Chat',
+    href: '/chat',
     icon: (active) => (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? '2.2' : '1.8'} strokeLinecap="round" strokeLinejoin="round">
         <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
@@ -48,6 +42,7 @@ const NAV_ITEMS: NavItem[] = [
   {
     id: 'alerts',
     label: 'Anomalies & Alerts',
+    href: '/alerts',
     badge: 2,
     icon: (active) => (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? '2.2' : '1.8'} strokeLinecap="round" strokeLinejoin="round">
@@ -60,7 +55,7 @@ const NAV_ITEMS: NavItem[] = [
 
 export function Sidebar() {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [activeTab, setActiveTab] = useState('shift');
+  const pathname = usePathname();
   const [apiOnline, setApiOnline] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -85,19 +80,23 @@ export function Sidebar() {
       {/* Header / Logo section */}
       <div className={styles.header}>
         {isExpanded ? (
-          <div className={styles.fullLogoWrapper} title="ResumeAI Coforge">
+          <Link href="/" className={styles.fullLogoWrapper} title="ResumeAI Coforge">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/resume_ai.svg"
               alt="ResumeAI Coforge"
               className={styles.fullLogoImg}
             />
-          </div>
+          </Link>
         ) : (
-          <div
+          <Link
+            href="/"
             className={styles.logoWrapper}
             title="ResumeAI Coforge"
-            onClick={() => setIsExpanded(true)}
+            onClick={() => {
+              // Expand sidebar if clicking logo when collapsed
+              setIsExpanded(true);
+            }}
           >
             <div className={styles.logo}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -108,7 +107,7 @@ export function Sidebar() {
                 height={26}
               />
             </div>
-          </div>
+          </Link>
         )}
 
         {/* Toggle Expand / Collapse Button */}
@@ -138,13 +137,12 @@ export function Sidebar() {
       {/* Main Navigation */}
       <nav className={styles.nav}>
         {NAV_ITEMS.map((item) => {
-          const isActive = activeTab === item.id;
+          const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
           return (
-            <button
+            <Link
               key={item.id}
-              type="button"
+              href={item.href}
               className={`${styles.navItem} ${isActive ? styles.navItemActive : ''}`}
-              onClick={() => setActiveTab(item.id)}
               aria-label={item.label}
             >
               <span className={styles.iconWrapper}>{item.icon(isActive)}</span>
@@ -155,7 +153,7 @@ export function Sidebar() {
                 </span>
               )}
               {!isExpanded && <span className={styles.tooltip}>{item.label}</span>}
-            </button>
+            </Link>
           );
         })}
       </nav>
@@ -181,16 +179,16 @@ export function Sidebar() {
         {/* User Profile */}
         <div className={`${styles.userBlock} ${isExpanded ? styles.userBlockExpanded : ''}`}>
           <div className={styles.avatarWrapper}>
-            <div className={styles.avatar}>RV</div>
+            <div className={styles.avatar}>U</div>
             <span className={styles.onlineDot} />
           </div>
           {isExpanded ? (
             <div className={styles.userInfo}>
-              <span className={styles.userName}>Renata V.</span>
+              <span className={styles.userName}>User</span>
               <span className={styles.userRole}>Desk Trader</span>
             </div>
           ) : (
-            <span className={styles.tooltip}>Renata V. (Desk Trader)</span>
+            <span className={styles.tooltip}>User (Desk Trader)</span>
           )}
         </div>
 

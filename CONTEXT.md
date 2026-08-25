@@ -23,3 +23,19 @@ _Avoid_: Urgency level
 **Meeting embedding**:
 Vetor pré-calculado (modelo multilíngue local, offline) a partir de `title` + `simple_summary` + `keywords` de uma reunião. Persistido junto com a reunião; recalculado quando o conteúdo desses campos muda.
 _Avoid_: Vector, encoding
+
+**Quick Chat**:
+Conversa global usada para produzir briefings, oferecer direcionamento e investigar evidências em várias reuniões pertencentes ao meeting scope selecionado.
+_Avoid_: Meeting Chat (conversa restrita a uma única reunião), chat geral
+
+**Meeting scope**:
+Conjunto de reuniões incluídas como fontes para uma pergunta do Quick Chat, definido pelo seletor ativo no momento em que a pergunta é enviada. Pode ser baseado em quantidade de reuniões ou em uma janela de tempo.
+_Avoid_: Context (também pode significar histórico da conversa ou janela do modelo), todas as reuniões
+
+**Scope change**:
+Transição confirmada entre dois meeting scopes dentro da mesma conversa, registrada quando o usuário envia a primeira pergunta com um novo seletor ativo.
+_Avoid_: Nova conversa, filtro silencioso
+
+**Evidence reference**:
+Ligação entre uma afirmação da resposta e sua origem em uma reunião, identificando a reunião e, quando disponível, o trecho ou timestamp que sustenta a afirmação.
+_Avoid_: Source genérica, referência sem origem
