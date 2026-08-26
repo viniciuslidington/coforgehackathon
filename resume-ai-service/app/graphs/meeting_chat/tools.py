@@ -13,9 +13,9 @@ from app.services import finnhub_service
 
 def _external_failure(exc: Exception | None = None) -> dict[str, Any]:
     if isinstance(exc, finnhub_service.FinnhubTimeoutError):
-        reason = "A consulta ao Finnhub excedeu o tempo limite."
+        reason = "The Finnhub request timed out."
     else:
-        reason = "O Finnhub está indisponível ou não foi configurado."
+        reason = "Finnhub is unavailable or not configured."
     return {"ok": False, "reason": reason, "source": "Finnhub"}
 
 
@@ -36,7 +36,7 @@ def search_transcript_keyword(
     """Find exact, case-insensitive occurrences of a term in the current meeting."""
     needle = term.strip().casefold()
     if not needle:
-        return {"ok": False, "reason": "Informe um termo não vazio."}
+        return {"ok": False, "reason": "Provide a non-empty term."}
     matches = [
         {
             "start": caption.get("start", ""),
@@ -125,7 +125,7 @@ def get_geopolitical_analysis(asset_or_topic: str) -> dict[str, Any]:
     except Exception as exc:
         return {
             "ok": False,
-            "reason": "As notícias foram encontradas, mas a síntese geopolítica falhou.",
+            "reason": "The news was found, but the geopolitical synthesis failed.",
             "source": "Finnhub",
             "articles": news["articles"],
             "error_type": type(exc).__name__,

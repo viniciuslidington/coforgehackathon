@@ -8,10 +8,7 @@ import { useMeetingDetail } from '@/features/call-detail/model/useMeetingDetail'
 import { MeetingDetailModal } from '@/features/call-detail/ui/MeetingDetailModal';
 import { useCallFilters } from '@/features/call-filters/model/useCallFilters';
 import { SortDropdown } from '@/features/call-filters/ui/SortDropdown';
-import { TopicsPicker } from '@/features/call-filters/ui/TopicsPicker';
 import styles from './CallHistory.module.css';
-
-const TOPICS_STORAGE_KEY = 'meeting-topics';
 
 const PERIODS: { label: string; value: MeetingPeriod }[] = [
   { label: 'Today', value: 'day' },
@@ -21,7 +18,11 @@ const PERIODS: { label: string; value: MeetingPeriod }[] = [
 ];
 const PAGE_SIZES = [15, 30, 50, 100];
 
-export function CallHistory() {
+interface CallHistoryProps {
+  topics?: string[];
+}
+
+export function CallHistory({ topics = [] }: CallHistoryProps) {
   const [period, setPeriod] = useState<MeetingPeriod>('all');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
@@ -30,36 +31,14 @@ export function CallHistory() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const meetingDetail = useMeetingDetail();
-  const [topics, setTopics] = useState<string[]>([]);
   const { sort, selectSort } = useCallFilters();
 
-  // Deliberately not a lazy useState initializer: this component renders on
-  // the server first (no `window`), so restoring from localStorage has to
-  // happen post-mount to avoid a hydration mismatch between the server's
-  // empty render and the client's real stored value.
-  useEffect(() => {
-    const restoreTopics = window.setTimeout(() => {
-      try {
-        const saved = window.localStorage.getItem(TOPICS_STORAGE_KEY);
-        if (saved) setTopics(JSON.parse(saved) as string[]);
-      } catch {
-        // Storage may be unavailable (e.g. Safari private mode), or hold a
-        // stale/invalid value — either way, just keep the empty default.
-      }
-    }, 0);
-    return () => window.clearTimeout(restoreTopics);
-  }, []);
-
-  const applyTopics = (next: string[]) => {
-    setLoading(true);
+  const [prevTopics, setPrevTopics] = useState(topics);
+  if (topics !== prevTopics) {
+    setPrevTopics(topics);
     setPage(1);
-    setTopics(next);
-    try {
-      window.localStorage.setItem(TOPICS_STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      // Storage may be unavailable (e.g. Safari private mode) — just skip persisting.
-    }
-  };
+    setLoading(true);
+  }
 
   useEffect(() => {
     const controller = new AbortController();
@@ -82,6 +61,7 @@ export function CallHistory() {
     };
   }, [page, pageSize, period, topics, sort]);
 
+  const hasTopics = topics.length > 0;
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const selectPeriod = (value: MeetingPeriod) => {
@@ -128,7 +108,6 @@ export function CallHistory() {
           <button className={styles.syncButton} onClick={handleSync} disabled={syncing}>
             {syncing ? 'Syncing…' : 'Get more meetings'}
           </button>
-          <TopicsPicker topics={topics} onChange={applyTopics} />
           <SortDropdown sort={sort} onSelect={selectSort} />
           <div className={styles.periods} aria-label="Date range">
             {PERIODS.map(({ label, value }) => (
@@ -146,21 +125,21 @@ export function CallHistory() {
         </div>
       </div>
 
-      <div className={styles.colHeaders}>
+      <div className={`${styles.colHeaders} ${hasTopics ? '' : styles.noPriority}`}>
         <div>DATE</div>
         <div>DURATION</div>
         <div>MEETING</div>
         <div>PARTICIPANTS</div>
         <div>AI SUMMARY</div>
         <div>KEYWORDS</div>
-        <div>PRIORITY</div>
+        {hasTopics && <div>PRIORITY</div>}
       </div>
 
       <div className={styles.rows} aria-live="polite">
         {error && <p className={styles.message}>{error} Check that the Meeting Insights API is running.</p>}
         {!error && !loading && data?.items.length === 0 && <p className={styles.message}>No meetings found for this date range.</p>}
         {(data?.items ?? []).map((meeting) => (
-          <CallRow key={meeting.meeting_id} meeting={meeting} onOpen={meetingDetail.openMeeting} />
+          <CallRow key={meeting.meeting_id} meeting={meeting} onOpen={meetingDetail.openMeeting} showPriority={hasTopics} />
         ))}
       </div>
 

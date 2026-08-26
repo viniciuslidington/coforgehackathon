@@ -210,7 +210,7 @@ def ask_meeting_question(meeting_id: str, request: QuestionRequest) -> Streaming
                             ))
         except Exception as exc:
             logger.exception("Meeting chat stream failed for meeting=%s", meeting_id)
-            detail = str(exc) if isinstance(exc, RuntimeError) else "Não foi possível concluir a resposta."
+            detail = str(exc) if isinstance(exc, RuntimeError) else "Could not complete the response."
             yield _sse(ErrorEvent(detail=detail))
 
     return StreamingResponse(

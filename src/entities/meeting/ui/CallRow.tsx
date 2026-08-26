@@ -7,16 +7,17 @@ import styles from './CallRow.module.css';
 interface CallRowProps {
   meeting: MeetingSummary;
   onOpen?: (meeting: MeetingSummary) => void;
+  showPriority?: boolean;
 }
 
-export function CallRow({ meeting, onOpen }: CallRowProps) {
+export function CallRow({ meeting, onOpen, showPriority = true }: CallRowProps) {
   const date = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
     .format(new Date(`${meeting.meeting_date}T00:00:00`));
   const duration = `${Math.floor(meeting.duration_seconds / 60)}m ${meeting.duration_seconds % 60}s`;
 
   return (
     <article
-      className={styles.row}
+      className={`${styles.row} ${showPriority ? '' : styles.noPriority}`}
       onClick={() => onOpen?.(meeting)}
       style={onOpen ? { cursor: 'pointer' } : undefined}
     >
@@ -43,7 +44,7 @@ export function CallRow({ meeting, onOpen }: CallRowProps) {
         )) : <span className={styles.emptyKeyword}>No keywords yet</span>}
       </div>
 
-      {meeting.priority_tier && meeting.priority_score != null && (
+      {showPriority && meeting.priority_tier && meeting.priority_score != null && (
         <div className={styles.priority}>
           <PriorityBadge tier={meeting.priority_tier} score={meeting.priority_score} />
         </div>

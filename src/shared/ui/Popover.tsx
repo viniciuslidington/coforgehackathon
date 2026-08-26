@@ -6,9 +6,18 @@ import styles from './Popover.module.css';
 interface PopoverProps {
   trigger: (props: { open: boolean; toggle: () => void }) => ReactNode;
   children: ReactNode;
+  align?: 'left' | 'right';
+  className?: string;
+  panelClassName?: string;
 }
 
-export function Popover({ trigger, children }: PopoverProps) {
+export function Popover({
+  trigger,
+  children,
+  align = 'left',
+  className,
+  panelClassName,
+}: PopoverProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -34,10 +43,17 @@ export function Popover({ trigger, children }: PopoverProps) {
     };
   }, [open]);
 
+  const rootClass = [styles.root, className].filter(Boolean).join(' ');
+  const panelClass = [
+    styles.panel,
+    align === 'right' ? styles.panelRight : styles.panelLeft,
+    panelClassName,
+  ].filter(Boolean).join(' ');
+
   return (
-    <div className={styles.root} ref={rootRef}>
+    <div className={rootClass} ref={rootRef}>
       {trigger({ open, toggle })}
-      {open && <div className={styles.panel}>{children}</div>}
+      {open && <div className={panelClass}>{children}</div>}
     </div>
   );
 }

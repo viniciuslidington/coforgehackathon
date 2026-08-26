@@ -8,6 +8,10 @@
   border-left: 2px solid transparent;
   transition: background 0.12s ease;
 }
+
+.row.noPriority {
+  grid-template-columns: 110px 70px minmax(150px, 0.75fr) minmax(130px, 0.8fr) minmax(220px, 1.4fr) minmax(180px, 0.9fr);
+}
 .row:hover {
   background: var(--bg-6);
 }
