@@ -4,6 +4,11 @@ export type Priority = 'urgent' | 'high' | 'normal';
 
 export type SortKey = 'priority' | 'time';
 
+export type CallTypeFilter = 'all' | 'hoot' | 'group';
+export type PriorityFilter = 'all' | 'urgent' | 'high' | 'normal';
+export type SortColumn = 'date' | 'type' | 'priority';
+export type SortDirection = 'asc' | 'desc';
+
 export interface MeetingSummary {
   meeting_id: string;
   title: string;
@@ -15,6 +20,7 @@ export interface MeetingSummary {
   refreshed_at: string;
   priority_score?: number | null;
   priority_tier?: Priority | null;
+  call_type?: 'hoot' | 'group' | string | null;
 }
 
 export interface MeetingSummaryPage {

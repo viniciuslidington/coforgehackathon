@@ -1,6 +1,7 @@
 'use client';
 
 import type { MeetingSummary } from '../model/types';
+import { formatMeetingDate, getCallType } from '../lib/helpers';
 import { PriorityBadge } from './PriorityBadge';
 import styles from './CallRow.module.css';
 
@@ -11,9 +12,9 @@ interface CallRowProps {
 }
 
 export function CallRow({ meeting, onOpen, showPriority = true }: CallRowProps) {
-  const date = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-    .format(new Date(`${meeting.meeting_date}T00:00:00`));
+  const date = formatMeetingDate(meeting.meeting_date);
   const duration = `${Math.floor(meeting.duration_seconds / 60)}m ${meeting.duration_seconds % 60}s`;
+  const callType = getCallType(meeting);
 
   return (
     <article
@@ -23,6 +24,12 @@ export function CallRow({ meeting, onOpen, showPriority = true }: CallRowProps) 
     >
       <div>
         <div className={styles.time}>{date}</div>
+      </div>
+
+      <div>
+        <span className={styles.typeBadge} data-type={callType.type}>
+          {callType.label}
+        </span>
       </div>
 
       <div className={styles.duration}>{duration}</div>

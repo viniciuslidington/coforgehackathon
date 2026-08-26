@@ -1,10 +1,15 @@
 fastapi
-uvicorn
+uvicorn[standard]
 python-multipart
 pydantic
 openai
 langchain-core
 langchain-openai
 langgraph
+langgraph-checkpoint-sqlite
 python-dotenv
 boto3
+fastembed
+numpy
+httpx
+pytest
