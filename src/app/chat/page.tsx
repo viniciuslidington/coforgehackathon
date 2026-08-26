@@ -28,18 +28,18 @@ const INITIAL_MESSAGES: Message[] = [
     id: 'm1',
     role: 'user',
     sender: 'User',
-    text: 'Houve alguma menção crítica a liquidez ou risco de spread cambial nas reuniões de abertura do shift de hoje?',
+    text: 'Was there any critical mention of liquidity or FX spread risk in today’s opening shift meetings?',
     timestamp: '09:42',
   },
   {
     id: 'm2',
     role: 'ai',
     sender: 'ResumeAI Intelligence',
-    text: 'Sim. Durante a call de abertura do desk e na reunião regional de FX, foram identificados 2 pontos de atenção com impacto direto em spread e liquidez:',
+    text: 'Yes. During the desk opening call and the regional FX meeting, 2 points of attention were identified with direct impact on spread and liquidity:',
     bullets: [
-      'Divergência de spread em BRL/USD: Citi Desk alertou sobre volatilidade aumentada pré-abertura de NY com spreads abrindo até 12bps acima da média semanal.',
-      'Risco de liquidez spot em Euro/Dólar: Mesa de Tesouraria reportou restrição temporária de liquidez em blocos acima de $25M aguardando o pronunciamento do Fed às 14h.',
-      'Recomendação da IA: Priorizar ordens com execução TWAP e monitorar o canal de alertas de anomalias no fechamento das 11h.',
+      'BRL/USD spread divergence: Citi Desk flagged increased volatility ahead of the NY open, with spreads opening up to 12bps above the weekly average.',
+      'EUR/USD spot liquidity risk: Treasury Desk reported a temporary liquidity restriction on blocks above $25M pending the 2pm Fed statement.',
+      'AI recommendation: Prioritize TWAP execution and monitor the anomaly alerts channel at the 11am close.',
     ],
     sources: [
       {
@@ -47,7 +47,7 @@ const INITIAL_MESSAGES: Message[] = [
         meetingTitle: 'Morning FX Desk & Flow Briefing',
         speaker: 'CITI-FX (Marcus S.)',
         time: '00:08:42',
-        quote: 'Notamos os books de BRL abrindo com spread esticado em 12bps, liquidity providers estão defensivos antes dos dados.',
+        quote: 'We noticed BRL books opening with a stretched 12bps spread, liquidity providers are defensive ahead of the data.',
         relevance: 96,
       },
       {
@@ -55,7 +55,7 @@ const INITIAL_MESSAGES: Message[] = [
         meetingTitle: 'Treasury & Liquidity Operations Call',
         speaker: 'Desk Chief (Elena V.)',
         time: '00:19:15',
-        quote: 'Grandes ordens em EUR acima de 25M devem aguardar ou fatiar via algoritmo, book spot está raso nesta manhã.',
+        quote: 'Large EUR orders above 25M should wait or be sliced via algo, the spot book is thin this morning.',
         relevance: 91,
       },
     ],
@@ -64,10 +64,10 @@ const INITIAL_MESSAGES: Message[] = [
 ];
 
 const SUGGESTIONS = [
-  'Resumo das reuniões de macro do dia',
-  'Quais ordens tiveram bloqueio de compliance?',
-  'Houve menção a decisões de taxa de juros (Fed/BCE)?',
-  'Quais tópicos tiveram maior frequência no turno?',
+  'Summary of today’s macro meetings',
+  'Which orders had a compliance block?',
+  'Was there any mention of rate decisions (Fed/ECB)?',
+  'Which topics came up most often this shift?',
 ];
 
 let idCounter = 100;
@@ -107,10 +107,10 @@ export default function ChatPage() {
       id: generateId('ai'),
       role: 'ai',
       sender: 'ResumeAI Intelligence',
-      text: `Analisando a base de dados de reuniões com foco em "${query}"...`,
+      text: `Analyzing the meeting database with a focus on "${query}"...`,
       bullets: [
-        'Cruzamento semântico executado contra 14 reuniões e 3 hoots do turno atual.',
-        'Nenhum outro impedimento operacional direto registrado para este recorte.',
+        'Semantic cross-reference run against 14 meetings and 3 hoots from the current shift.',
+        'No other direct operational blocker recorded for this scope.',
       ],
       sources: [
         {
@@ -118,7 +118,7 @@ export default function ChatPage() {
           meetingTitle: 'Shift Operations Sync',
           speaker: 'Trader Desk A',
           time: '00:12:04',
-          quote: `Discussão relevante sobre o fluxo de execução e parâmetros de mercado referentes a ${query.slice(0, 30)}...`,
+          quote: `Relevant discussion on execution flow and market parameters related to ${query.slice(0, 30)}...`,
           relevance: 88,
         },
       ],
@@ -157,7 +157,7 @@ export default function ChatPage() {
                 <span className={styles.modelTag}>v2.4 · LangGraph</span>
               </div>
               <span className={styles.modelSub}>
-                RAG sobre transcripts, áudios e sumários em tempo real
+                RAG over transcripts, audio, and summaries in real time
               </span>
             </div>
           </div>
@@ -167,23 +167,23 @@ export default function ChatPage() {
               className={styles.contextSelect}
               value={contextScope}
               onChange={(e) => setContextScope(e.target.value)}
-              title="Escopo de dados para o chat"
+              title="Data scope for the chat"
             >
-              <option value="all">Todo o Turno (14 Reuniões)</option>
-              <option value="hoots">Apenas Hoots & Áudios Rápidos</option>
-              <option value="urgent">Reuniões com Prioridade Alta/Urgente</option>
+              <option value="all">Full Shift (14 Meetings)</option>
+              <option value="hoots">Hoots & Quick Audio Only</option>
+              <option value="urgent">High Priority/Urgent Meetings</option>
             </select>
 
             <button
               type="button"
               className={styles.newChatBtn}
               onClick={() => setMessages([INITIAL_MESSAGES[0], INITIAL_MESSAGES[1]])}
-              title="Limpar e reiniciar conversa"
+              title="Clear and restart conversation"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 5v14M5 12h14" />
               </svg>
-              Nova conversa
+              New conversation
             </button>
           </div>
         </header>
@@ -236,12 +236,12 @@ export default function ChatPage() {
                                 <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
                                 <line x1="7" y1="7" x2="7.01" y2="7" />
                               </svg>
-                              <span>Fontes Citadas & Evidências</span>
+                              <span>Cited Sources & Evidence</span>
                               <span className={styles.sourcesCountBadge}>
-                                {m.sources!.length} trechos
+                                {m.sources!.length} excerpts
                               </span>
                             </div>
-                            <span>{isSourcesExpanded ? '▲ Recolher' : '▼ Expandir'}</span>
+                            <span>{isSourcesExpanded ? '▲ Collapse' : '▼ Expand'}</span>
                           </div>
 
                           {isSourcesExpanded && (
@@ -299,7 +299,7 @@ export default function ChatPage() {
             <div className={styles.inputCard}>
               <textarea
                 className={styles.textarea}
-                placeholder="Pergunte sobre qualquer reunião, menção de ativos, decisões ou participantes do turno..."
+                placeholder="Ask about any meeting, asset mention, decision, or participant from this shift..."
                 value={draft}
                 rows={1}
                 onChange={(e) => setDraft(e.target.value)}
@@ -310,7 +310,7 @@ export default function ChatPage() {
                 className={styles.sendBtn}
                 disabled={!draft.trim()}
                 onClick={() => handleSend()}
-                aria-label="Enviar mensagem"
+                aria-label="Send message"
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="22" y1="2" x2="11" y2="13" />
@@ -320,7 +320,7 @@ export default function ChatPage() {
             </div>
 
             <div className={styles.inputFooterNote}>
-              ResumeAI pode consultar citações diretas com carimbo de tempo nas transcrições gravadas.
+              ResumeAI can pull direct, timestamped quotes from recorded transcripts.
             </div>
           </div>
         </div>

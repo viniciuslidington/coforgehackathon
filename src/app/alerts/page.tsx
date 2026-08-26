@@ -23,53 +23,53 @@ interface AnomalyAlert {
 const INITIAL_ALERTS: AnomalyAlert[] = [
   {
     id: 'alt-1',
-    title: 'Discrepância Crítica de Spread Cambial (BRL/USD)',
+    title: 'Critical FX Spread Discrepancy (BRL/USD)',
     severity: 'critical',
     meetingTitle: 'Morning FX Desk & Flow Briefing',
     speakers: ['CITI-FX (Marcus S.)', 'Desk Trader B'],
     diagnostic:
-      'Detecção de spread 12bps acima da média histórica móvel (30d). Três participantes reportaram defensividade e recuo expressivo de liquidity providers antes da divulgação de inflação americana.',
+      'Spread detected at 12bps above the 30-day moving average. Three participants reported defensiveness and a sharp pullback from liquidity providers ahead of the US inflation release.',
     tags: ['#BRLUSD', '#SpreadDivergence', '#LiquidityRisk'],
-    timeAgo: 'Há 18 min',
+    timeAgo: '18 min ago',
     timestamp: '09:30 AM',
     status: 'active',
   },
   {
     id: 'alt-2',
-    title: 'Alerta de Volatilidade de Volume em Abertura de Setor',
+    title: 'Volume Volatility Alert at Sector Open',
     severity: 'critical',
     meetingTitle: 'Equities Pre-Market Sync',
     speakers: ['Head Equities (Andre K.)'],
     diagnostic:
-      'Fluxo atípico de ordens em bloco no setor de Energia (Petróleo/O&G) com volume 320% acima do desvio padrão do primeiro minuto de pregão.',
+      'Atypical block-order flow in the Energy sector (Oil/O&G) with volume 320% above the standard deviation for the first minute of trading.',
     tags: ['#EnergyFlow', '#BlockOrders', '#Volatility'],
-    timeAgo: 'Há 34 min',
+    timeAgo: '34 min ago',
     timestamp: '09:14 AM',
     status: 'active',
   },
   {
     id: 'alt-3',
-    title: 'Hesitação e Risco de Compliance em Ordem Cruzada',
+    title: 'Hesitation and Compliance Risk on Cross Order',
     severity: 'high',
     meetingTitle: 'Treasury & Liquidity Operations Call',
     speakers: ['Desk Chief (Elena V.)', 'Trader Marco'],
     diagnostic:
-      'Identificado pedido explícito de dupla checagem para execução de cross-order institucional de $40M acima do limite de tolerância pré-aprovado.',
+      'Explicit request identified for a double-check before executing a $40M institutional cross-order above the pre-approved tolerance limit.',
     tags: ['#Compliance', '#CrossOrder', '#TreasuryLimit'],
-    timeAgo: 'Há 52 min',
+    timeAgo: '52 min ago',
     timestamp: '08:56 AM',
     status: 'active',
   },
   {
     id: 'alt-4',
-    title: 'Ausência de Quórum em Alinhamento de Handoff',
+    title: 'Missing Quorum on Handoff Alignment',
     severity: 'medium',
     meetingTitle: 'Commodities Desk Sync',
     speakers: ['Commodities Trader 1'],
     diagnostic:
-      'Apenas 1 operador presente no início da chamada de sincronização; handoff de posições do book noturno registrado com atraso operacional de 15 minutos.',
+      'Only 1 trader present at the start of the sync call; overnight book handoff logged with a 15-minute operational delay.',
     tags: ['#DeskHandoff', '#Commodities', '#Operations'],
-    timeAgo: 'Há 1h 10min',
+    timeAgo: '1h 10min ago',
     timestamp: '08:38 AM',
     status: 'active',
   },
@@ -131,11 +131,11 @@ export default function AlertsPage() {
               <h1 className={styles.title}>Anomalies & Alerts</h1>
               <div className={styles.badgeLive}>
                 <span className={styles.liveDot} />
-                <span>{activeCount} ATIVOS · AI MONITORING</span>
+                <span>{activeCount} ACTIVE · AI MONITORING</span>
               </div>
             </div>
             <p className={styles.subtitle}>
-              Detecção contínua de desvios operacionais, spreads críticos e menções de risco via LangGraph
+              Continuous detection of operational deviations, critical spreads, and risk mentions via LangGraph
             </p>
           </div>
 
@@ -144,46 +144,46 @@ export default function AlertsPage() {
             className={styles.scanBtn}
             onClick={handleRunScan}
             disabled={scanning}
-            title="Executar varredura de anomalias nas reuniões recentes"
+            title="Run an anomaly scan on recent meetings"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
             </svg>
-            {scanning ? 'Escaneando...' : 'Executar Anomaly Scan'}
+            {scanning ? 'Scanning...' : 'Run Anomaly Scan'}
           </button>
         </header>
 
         {/* Top KPI Metrics Banner */}
         <div className={styles.kpiGrid}>
           <div className={`${styles.kpiCard} ${criticalCount > 0 ? styles.kpiCritical : ''}`}>
-            <span className={styles.kpiLabel}>Alertas Críticos</span>
+            <span className={styles.kpiLabel}>Critical Alerts</span>
             <div className={styles.kpiValueRow}>
               <span className={styles.kpiValue}>{criticalCount}</span>
-              <span className={styles.kpiDelta}>Ação Imediata</span>
+              <span className={styles.kpiDelta}>Immediate Action</span>
             </div>
           </div>
 
           <div className={styles.kpiCard}>
-            <span className={styles.kpiLabel}>Severidade Alta</span>
+            <span className={styles.kpiLabel}>High Severity</span>
             <div className={styles.kpiValueRow}>
               <span className={styles.kpiValue}>{highCount}</span>
-              <span className={styles.kpiDelta}>Atenção Trader</span>
+              <span className={styles.kpiDelta}>Trader Attention</span>
             </div>
           </div>
 
           <div className={styles.kpiCard}>
-            <span className={styles.kpiLabel}>Resolvidos no Turno</span>
+            <span className={styles.kpiLabel}>Resolved This Shift</span>
             <div className={styles.kpiValueRow}>
               <span className={styles.kpiValue}>{resolvedCount}</span>
-              <span className={styles.kpiDelta}>Tratados</span>
+              <span className={styles.kpiDelta}>Handled</span>
             </div>
           </div>
 
           <div className={styles.kpiCard}>
-            <span className={styles.kpiLabel}>Confiança do Modelo</span>
+            <span className={styles.kpiLabel}>Model Confidence</span>
             <div className={styles.kpiValueRow}>
               <span className={styles.kpiValue}>98.4%</span>
-              <span className={styles.kpiDelta}>Vetor Local</span>
+              <span className={styles.kpiDelta}>Local Vector</span>
             </div>
           </div>
         </div>
@@ -196,28 +196,28 @@ export default function AlertsPage() {
               className={`${styles.tabBtn} ${selectedSeverity === 'all' ? styles.tabBtnActive : ''}`}
               onClick={() => setSelectedSeverity('all')}
             >
-              Todos ({alerts.length})
+              All ({alerts.length})
             </button>
             <button
               type="button"
               className={`${styles.tabBtn} ${selectedSeverity === 'critical' ? styles.tabBtnActive : ''}`}
               onClick={() => setSelectedSeverity('critical')}
             >
-              Crítico ({alerts.filter((a) => a.severity === 'critical').length})
+              Critical ({alerts.filter((a) => a.severity === 'critical').length})
             </button>
             <button
               type="button"
               className={`${styles.tabBtn} ${selectedSeverity === 'high' ? styles.tabBtnActive : ''}`}
               onClick={() => setSelectedSeverity('high')}
             >
-              Alto ({alerts.filter((a) => a.severity === 'high').length})
+              High ({alerts.filter((a) => a.severity === 'high').length})
             </button>
             <button
               type="button"
               className={`${styles.tabBtn} ${selectedSeverity === 'medium' ? styles.tabBtnActive : ''}`}
               onClick={() => setSelectedSeverity('medium')}
             >
-              Médio ({alerts.filter((a) => a.severity === 'medium').length})
+              Medium ({alerts.filter((a) => a.severity === 'medium').length})
             </button>
           </div>
 
@@ -229,7 +229,7 @@ export default function AlertsPage() {
             <input
               type="text"
               className={styles.searchInput}
-              placeholder="Buscar por tag, ticker, texto..."
+              placeholder="Search by tag, ticker, text..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -240,7 +240,7 @@ export default function AlertsPage() {
         <div className={styles.feedList}>
           {filteredAlerts.length === 0 ? (
             <p style={{ color: 'var(--text-dim)', padding: '24px 0' }}>
-              Nenhuma anomalia encontrada para os filtros selecionados.
+              No anomalies found for the selected filters.
             </p>
           ) : (
             filteredAlerts.map((alert) => {
@@ -269,10 +269,10 @@ export default function AlertsPage() {
                         <h3 className={styles.cardTitle}>{alert.title}</h3>
                       </div>
                       <div className={styles.cardMeta}>
-                        <span>Reunião:</span>
+                        <span>Meeting:</span>
                         <span className={styles.cardMeetingTag}>{alert.meetingTitle}</span>
                         <span>·</span>
-                        <span>Participantes: {alert.speakers.join(', ')}</span>
+                        <span>Participants: {alert.speakers.join(', ')}</span>
                       </div>
                     </div>
 
@@ -282,7 +282,7 @@ export default function AlertsPage() {
                   </div>
 
                   <div className={styles.cardDiagnostic}>
-                    <strong>Diagnóstico IA: </strong>
+                    <strong>AI Diagnostic: </strong>
                     {alert.diagnostic}
                   </div>
 
@@ -300,7 +300,7 @@ export default function AlertsPage() {
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
                         </svg>
-                        Investigar com IA
+                        Investigate with AI
                       </Link>
 
                       <button
@@ -308,7 +308,7 @@ export default function AlertsPage() {
                         className={styles.actionBtn}
                         onClick={() => handleResolve(alert.id)}
                       >
-                        {isResolved ? '↩ Reabrir Alerta' : '✓ Marcar Ciente / Resolvido'}
+                        {isResolved ? '↩ Reopen Alert' : '✓ Acknowledge / Resolve'}
                       </button>
                     </div>
                   </div>

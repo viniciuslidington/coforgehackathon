@@ -56,7 +56,7 @@ def _get(path: str, **params: str) -> Any:
     except httpx.TimeoutException as exc:
         raise FinnhubTimeoutError("A consulta ao Finnhub excedeu o tempo limite.") from exc
     except (httpx.HTTPError, ValueError) as exc:
-        raise FinnhubError("O Finnhub não conseguiu concluir a consulta.") from exc
+        raise FinnhubError("Finnhub could not complete the request.") from exc
 
 
 def search_symbol(query: str) -> str | None:

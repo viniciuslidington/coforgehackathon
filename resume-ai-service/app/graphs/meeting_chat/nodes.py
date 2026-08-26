@@ -23,8 +23,8 @@ def run_agent(state: ChatState) -> ChatState:
     transcript = state.get("transcript", "")
     context_prompt = (
         f"{ANSWER_QUESTION_SYSTEM_PROMPT}\n\n"
-        f"ID da reunião: {state.get('meeting_id', 'não informado')}\n"
-        f"Conteúdo completo da reunião:\n{transcript}"
+        f"Meeting ID: {state.get('meeting_id', 'not provided')}\n"
+        f"Full meeting content:\n{transcript}"
     )
     response = get_model().bind_tools(MEETING_CHAT_TOOLS).invoke([
         SystemMessage(content=context_prompt),
@@ -41,7 +41,7 @@ def synthesize_answer(state: ChatState) -> ChatState:
     response = get_model().invoke([
         SystemMessage(content=(
             f"{FINAL_ANSWER_SYSTEM_PROMPT}\n\n"
-            f"Conteúdo completo da reunião:\n{transcript}"
+            f"Full meeting content:\n{transcript}"
         )),
         *messages,
         HumanMessage(content=FINAL_ANSWER_REQUEST),
