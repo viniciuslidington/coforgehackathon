@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { ChatMessage, MeetingSegment, MeetingSummary } from '@/entities/meeting/model/types';
+import { formatMeetingDate } from '@/entities/meeting/lib/helpers';
 import { MeetingTimeline } from './MeetingTimeline';
 import { MeetingTranscript } from './MeetingTranscript';
 import { DetailChat } from './DetailChat';
@@ -35,8 +36,7 @@ export function MeetingDetailModal({
   onSend,
 }: MeetingDetailModalProps) {
   const [mode, setMode] = useState<'timeline' | 'transcript'>('timeline');
-  const date = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-    .format(new Date(`${meeting.meeting_date}T00:00:00`));
+  const date = formatMeetingDate(meeting.meeting_date);
   const duration = `${Math.floor(meeting.duration_seconds / 60)}m ${meeting.duration_seconds % 60}s`;
 
   return (

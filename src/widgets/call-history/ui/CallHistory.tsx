@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import type { MeetingPeriod, MeetingSummaryPage } from '@/entities/meeting/model/types';
+import { filterMeetings, sortMeetings } from '@/entities/meeting/lib/helpers';
 import { getMeetingSummaries, syncMeetings } from '@/shared/api/meetings';
 import { CallRow } from '@/entities/meeting/ui/CallRow';
 import { useMeetingDetail } from '@/features/call-detail/model/useMeetingDetail';
 import { MeetingDetailModal } from '@/features/call-detail/ui/MeetingDetailModal';
 import { useCallFilters } from '@/features/call-filters/model/useCallFilters';
-import { SortDropdown } from '@/features/call-filters/ui/SortDropdown';
+import { FilterDropdown } from '@/features/call-filters/ui/FilterDropdown';
 import styles from './CallHistory.module.css';
 
 const PERIODS: { label: string; value: MeetingPeriod }[] = [
@@ -23,6 +24,7 @@ interface CallHistoryProps {
 }
 
 export function CallHistory({ topics = [] }: CallHistoryProps) {
+  const hasTopics = topics.length > 0;
   const [period, setPeriod] = useState<MeetingPeriod>('all');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
@@ -31,7 +33,16 @@ export function CallHistory({ topics = [] }: CallHistoryProps) {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const meetingDetail = useMeetingDetail();
-  const { sort, selectSort } = useCallFilters();
+  const {
+    typeFilter,
+    setTypeFilter,
+    priorityFilter,
+    setPriorityFilter,
+    sortColumn,
+    sortDirection,
+    toggleSort,
+    resetFilters,
+  } = useCallFilters(hasTopics);
 
   const [prevTopics, setPrevTopics] = useState(topics);
   if (topics !== prevTopics) {
@@ -40,10 +51,12 @@ export function CallHistory({ topics = [] }: CallHistoryProps) {
     setLoading(true);
   }
 
+  const backendSort = sortColumn === 'priority' ? 'priority' : 'time';
+
   useEffect(() => {
     const controller = new AbortController();
     let active = true;
-    getMeetingSummaries(period, page, pageSize, topics, sort, controller.signal)
+    getMeetingSummaries(period, page, pageSize, topics, backendSort, controller.signal)
       .then((result) => {
         if (active) setData(result);
       })
@@ -59,9 +72,8 @@ export function CallHistory({ topics = [] }: CallHistoryProps) {
       active = false;
       controller.abort();
     };
-  }, [page, pageSize, period, topics, sort]);
+  }, [page, pageSize, period, topics, backendSort]);
 
-  const hasTopics = topics.length > 0;
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const selectPeriod = (value: MeetingPeriod) => {
@@ -87,7 +99,7 @@ export function CallHistory({ topics = [] }: CallHistoryProps) {
       setPage(1);
       // Changing the page alone does not retrigger the request when already
       // on page one, so reload the current result explicitly after syncing.
-      const refreshed = await getMeetingSummaries(period, 1, pageSize, topics, sort);
+      const refreshed = await getMeetingSummaries(period, 1, pageSize, topics, backendSort);
       setData(refreshed);
     } catch (syncError: unknown) {
       setError(syncError instanceof Error ? syncError.message : 'Could not sync meetings.');
@@ -96,6 +108,13 @@ export function CallHistory({ topics = [] }: CallHistoryProps) {
       setLoading(false);
     }
   };
+
+  const items = data?.items ?? [];
+  const filteredAndSortedItems = sortMeetings(
+    filterMeetings(items, typeFilter, priorityFilter),
+    sortColumn,
+    sortDirection,
+  );
 
   return (
     <section className={styles.panel} aria-label="Meeting summaries">
@@ -108,7 +127,14 @@ export function CallHistory({ topics = [] }: CallHistoryProps) {
           <button className={styles.syncButton} onClick={handleSync} disabled={syncing}>
             {syncing ? 'Syncing…' : 'Get more meetings'}
           </button>
-          <SortDropdown sort={sort} onSelect={selectSort} />
+          <FilterDropdown
+            typeFilter={typeFilter}
+            onSelectType={setTypeFilter}
+            priorityFilter={priorityFilter}
+            onSelectPriority={setPriorityFilter}
+            showPriorityOptions={hasTopics}
+            onReset={resetFilters}
+          />
           <div className={styles.periods} aria-label="Date range">
             {PERIODS.map(({ label, value }) => (
               <button key={value} className={`${styles.period} ${period === value ? styles.active : ''}`} onClick={() => selectPeriod(value)}>
@@ -126,19 +152,60 @@ export function CallHistory({ topics = [] }: CallHistoryProps) {
       </div>
 
       <div className={`${styles.colHeaders} ${hasTopics ? '' : styles.noPriority}`}>
-        <div>DATE</div>
+        <button
+          type="button"
+          className={`${styles.sortableHeader} ${sortColumn === 'date' ? styles.headerActive : ''}`}
+          onClick={() => toggleSort('date')}
+          title="Sort by date"
+        >
+          <span>DATE</span>
+          <span className={styles.sortIndicator}>
+            {sortColumn === 'date' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          className={`${styles.sortableHeader} ${sortColumn === 'type' ? styles.headerActive : ''}`}
+          onClick={() => toggleSort('type')}
+          title="Sort by call type"
+        >
+          <span>TYPE</span>
+          <span className={styles.sortIndicator}>
+            {sortColumn === 'type' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
+          </span>
+        </button>
+
         <div>DURATION</div>
         <div>MEETING</div>
         <div>PARTICIPANTS</div>
         <div>AI SUMMARY</div>
         <div>KEYWORDS</div>
-        {hasTopics && <div>PRIORITY</div>}
+
+        {hasTopics && (
+          <button
+            type="button"
+            className={`${styles.sortableHeader} ${sortColumn === 'priority' ? styles.headerActive : ''}`}
+            onClick={() => toggleSort('priority')}
+            title="Sort by priority"
+          >
+            <span>PRIORITY</span>
+            <span className={styles.sortIndicator}>
+              {sortColumn === 'priority' ? (sortDirection === 'asc' ? '▲' : '▼') : '↕'}
+            </span>
+          </button>
+        )}
       </div>
 
       <div className={styles.rows} aria-live="polite">
         {error && <p className={styles.message}>{error} Check that the Meeting Insights API is running.</p>}
-        {!error && !loading && data?.items.length === 0 && <p className={styles.message}>No meetings found for this date range.</p>}
-        {(data?.items ?? []).map((meeting) => (
+        {!error && !loading && (data?.items ?? []).length === 0 && (
+          <p className={styles.message}>No meetings found for this date range.</p>
+        )}
+        {!error && !loading && (data?.items ?? []).length > 0 && filteredAndSortedItems.length === 0 && (
+          <p className={styles.message}>No meetings match the active filter criteria.</p>
+        )}
+        {filteredAndSortedItems.map((meeting) => (
           <CallRow key={meeting.meeting_id} meeting={meeting} onOpen={meetingDetail.openMeeting} showPriority={hasTopics} />
         ))}
       </div>

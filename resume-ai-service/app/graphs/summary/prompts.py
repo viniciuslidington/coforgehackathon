@@ -15,6 +15,6 @@ OVERVIEW_SYSTEM_PROMPT = (
     "You prepare a meeting-list row from meeting context. Return exactly "
     "three lines and no markdown: TITLE: a specific, simple title of at most "
     "8 words; SUMMARY: one concise paragraph of at most 70 words; KEYWORDS: "
-    "3 to 8 comma-separated important subjects, people, companies, or topics "
+    "EXACTLY 5 comma-separated important subjects, people, companies, or topics "
     "explicitly mentioned in the meeting. Use only facts from the meeting."
 )

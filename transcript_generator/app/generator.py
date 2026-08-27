@@ -60,13 +60,33 @@ def process_single_transcript(file_id: int, call_type: str, s3_client):
     if call_type == "hoot_call":
         trader_1 = random.choice(TRADERS_EN)
         topic = random.choice(TOPICS_HOOT)
-        prompt = f"""Generate an audio transcript in strict .VTT format of a 'Hoot Call' (a squawk box broadcast to the trading floor).
-        Speaker: {trader_1} (The Announcer/Squawk)
-        Topic: {topic}
-        Tone: Urgent, fast-paced.
-        Length: Short (3 to 6 broadcast lines).
-        Note Date: {business_date}
-        Output ONLY valid VTT code."""
+        prompt = f"""Generate a high-intensity audio transcript in strict .VTT format of a 'Hoot Call' (a squawk box broadcast to the trading floor).
+
+        Parameters:
+        - Language: English
+        - Announcer / Squawk Trader: {trader_1}
+        - Core Alert Topic: {topic}
+        - Note Date: {business_date}
+        - Tone: Urgent, fast-paced, high stakes trading floor squawk.
+        - Duration: Around 45 seconds to 1 minute of broadcast (8 to 12 dialogue cues).
+
+        BROADCAST PACING & CONTENT:
+        - 00:00 to ~00:15: The Alert. Immediate squawk wake-up call, alerting the trading floor to the breaking event/print ('{topic}').
+        - ~00:15 to ~00:40: Market Impact & Flow. Specific details, numbers, volumes, affected tickers/options, widening spreads, and urgent risk checks.
+        - ~00:40 to ~01:00: Actionable Directives. Direct instructions to desk traders (check hedges, watch deltas, execution desk alerts).
+
+        CRITICAL RULES FOR TIMESTAMPS & SPEECH:
+        1. VARYING TIMESTAMPS: Timestamps MUST realistically match line length (e.g. short urgency commands take 2-4 seconds, data breakdowns take 5-8 seconds).
+        2. NATURAL SQUAWK TONE: Fast-paced, concise financial market jargon, ticker mentions, price levels, and trade urgency.
+        3. NO SILENT GAPS: Maintain continuous urgent delivery.
+        4. SPEAKER CONSISTENCY: Every single spoken cue MUST explicitly declare the announcer using the <v {trader_1}> tag.
+
+        VTT Rules:
+        - Start strictly with WEBVTT
+        - Timestamps format: 00:MM:SS.mmm --> 00:MM:SS.mmm
+        - Speaker format: <v {trader_1}> Dialogue here.
+        - DO NOT include NOTE blocks, headers, markdown fences, or extra text.
+        - Output ONLY valid VTT code."""
         file_name = f"{file_id:05d}_hootcall_{trader_1}.vtt"
         
     else:
