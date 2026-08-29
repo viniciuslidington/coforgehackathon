@@ -1,0 +1,83 @@
+.scope {
+  margin-top: 10px;
+}
+
+.pills {
+  display: flex;
+  gap: 6px;
+}
+
+.pill {
+  flex: 1;
+  height: 29px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  background: var(--bg-5);
+  color: var(--text-dim);
+  border: 1px solid var(--border-4);
+  transition: all 0.15s ease;
+}
+
+.pill:hover {
+  color: var(--text-tertiary);
+}
+
+.pillActive {
+  background: var(--teal-bg);
+  color: var(--teal-pale);
+  border-color: var(--teal-border);
+}
+
+.rangeRow {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.rangeField {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  color: var(--text-dimmest);
+}
+
+.rangeField input {
+  height: 27px;
+  padding: 0 7px;
+  border-radius: 7px;
+  background: var(--bg-5);
+  border: 1px solid var(--border-4);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.rangeField input:focus-visible {
+  outline: none;
+  border-color: var(--teal-border);
+}
+
+.meta {
+  margin-top: 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--text-dimmer);
+}
+
+.warning {
+  margin-top: 8px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: var(--urgent-bg);
+  border: 1px solid var(--urgent-border);
+  color: var(--urgent);
+  font-size: 11px;
+  line-height: 1.45;
+}

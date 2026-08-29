@@ -28,18 +28,6 @@ const NAV_ITEMS: NavItem[] = [
     ),
   },
   {
-    id: 'chat',
-    label: 'AI Quick Chat',
-    href: '/chat',
-    icon: (active) => (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? '2.2' : '1.8'} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
-        <path d="M12 8v4" />
-        <path d="M12 16h.01" />
-      </svg>
-    ),
-  },
-  {
     id: 'alerts',
     label: 'Anomalies & Alerts',
     href: '/alerts',

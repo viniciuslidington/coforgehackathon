@@ -8,7 +8,7 @@ interface ChatInputProps {
   onChange: (value: string) => void;
   onSend: () => void;
   placeholder?: string;
-  suggestions?: { label: string; onAsk: () => void }[];
+  disabled?: boolean;
 }
 
 export function ChatInput({
@@ -16,27 +16,14 @@ export function ChatInput({
   onChange,
   onSend,
   placeholder = 'Ask what happened…',
-  suggestions,
+  disabled = false,
 }: ChatInputProps) {
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') onSend();
+    if (e.key === 'Enter' && !disabled) onSend();
   };
 
   return (
     <div className={styles.wrapper}>
-      {suggestions && suggestions.length > 0 && (
-        <div className={styles.suggestions}>
-          {suggestions.map(s => (
-            <button
-              key={s.label}
-              className={styles.suggestion}
-              onClick={s.onAsk}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
-      )}
       <div className={styles.inputRow}>
         <input
           value={value}
@@ -44,8 +31,9 @@ export function ChatInput({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           className={styles.input}
+          disabled={disabled}
         />
-        <button className={styles.sendBtn} onClick={onSend}>
+        <button className={styles.sendBtn} onClick={onSend} disabled={disabled || !value.trim()}>
           Ask
         </button>
       </div>

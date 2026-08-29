@@ -24,6 +24,9 @@ OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openrouter/free")
 # Some OpenRouter models otherwise default to a very large output reservation
 # (for example 65,536 tokens), exceeding demo credit limits.
 OPENROUTER_MAX_TOKENS = int(os.getenv("OPENROUTER_MAX_TOKENS", "1200"))
+# A briefing is three paragraphs plus key points, which does not reliably fit
+# in the chat-sized default above.
+OPENROUTER_BRIEFING_MAX_TOKENS = int(os.getenv("OPENROUTER_BRIEFING_MAX_TOKENS", "1600"))
 OPENROUTER_SITE_URL = os.getenv("OPENROUTER_SITE_URL", "http://localhost:8000")
 OPENROUTER_APP_NAME = os.getenv("OPENROUTER_APP_NAME", "Meeting Insights API")
 

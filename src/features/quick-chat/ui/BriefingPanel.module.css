@@ -1,0 +1,93 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--text-dimmest);
+}
+
+.keyPoints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.keyPoint {
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.keyPoint:disabled {
+  cursor: default;
+}
+
+.keyPoint[data-tone='urgent'] {
+  background: var(--urgent-bg);
+  color: var(--urgent);
+  border: 1px solid var(--urgent-border);
+}
+
+.keyPoint[data-tone='teal'] {
+  background: var(--teal-bg);
+  color: var(--teal-pale);
+  border: 1px solid var(--teal-border);
+}
+
+.keyPoint[data-tone='muted'] {
+  background: var(--bg-7);
+  color: var(--text-muted);
+  border: 1px solid var(--border-4);
+}
+
+.keyPoint:not(:disabled):hover,
+.keyPoint:not(:disabled):focus-visible {
+  filter: brightness(1.25);
+}
+
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  text-wrap: pretty;
+}
+
+.meetingLink {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--teal-light);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: var(--teal-border);
+  cursor: pointer;
+}
+
+.meetingLink:hover,
+.meetingLink:focus-visible {
+  color: var(--teal-pale);
+  text-decoration-color: currentColor;
+}
+
+.message {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+
+.note {
+  font-size: 11px;
+  color: var(--text-dimmer);
+}

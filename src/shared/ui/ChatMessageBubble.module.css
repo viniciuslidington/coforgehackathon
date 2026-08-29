@@ -47,3 +47,23 @@
 .ai .text {
   color: var(--text-secondary);
 }
+
+/* A meeting the agent cited: opens the meeting modal. Styled as inline text
+   rather than a control so it reads naturally mid-sentence. */
+.meetingLink {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--teal-light);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: var(--teal-border);
+  cursor: pointer;
+}
+
+.meetingLink:hover,
+.meetingLink:focus-visible {
+  color: var(--teal-pale);
+  text-decoration-color: currentColor;
+}

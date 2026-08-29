@@ -1,7 +1,7 @@
 .panel {
-  width: 392px;
-  flex: 0 1 392px;
-  min-width: 340px;
+  /* Width comes from the split handle on the page, not from here. */
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   border: 1px solid var(--border-3);
@@ -26,39 +26,11 @@
   font-weight: 600;
 }
 
-.contextLabel {
+.scopeLabel {
   font-family: var(--font-mono);
   font-size: 10px;
   color: var(--text-dimmest);
   letter-spacing: 0.08em;
-}
-
-.contextPills {
-  margin-top: 10px;
-  display: flex;
-  gap: 6px;
-}
-
-.ctxPill {
-  flex: 1;
-  height: 29px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  background: var(--bg-5);
-  color: var(--text-dim);
-  border: 1px solid var(--border-4);
-  transition: all 0.15s ease;
-}
-.ctxPill:hover {
-  color: var(--text-tertiary);
-}
-
-.ctxActive {
-  background: var(--teal-bg);
-  color: var(--teal-pale);
-  border-color: var(--teal-border);
 }
 
 .body {
@@ -66,48 +38,12 @@
   min-height: 0;
   overflow-y: auto;
   padding: 16px;
-}
-
-.kpLabel {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  color: var(--text-dimmest);
-}
-
-.kpList {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 9px;
-}
-
-.kpBadge {
-  padding: 4px 9px;
-  border-radius: 999px;
-  font-size: 11.5px;
-}
-
-.kpBadge[data-tone='urgent'] {
-  background: var(--urgent-bg);
-  color: var(--urgent);
-  border: 1px solid var(--urgent-border);
-}
-
-.kpBadge[data-tone='teal'] {
-  background: var(--teal-bg);
-  color: var(--teal-pale);
-  border: 1px solid var(--teal-border);
-}
-
-.kpBadge[data-tone='muted'] {
-  background: var(--bg-7);
-  color: var(--text-muted);
-  border: 1px solid var(--border-4);
+  flex-direction: column;
+  gap: 14px;
 }
 
 .messages {
-  margin-top: 18px;
   display: flex;
   flex-direction: column;
   gap: 12px;

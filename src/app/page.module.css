@@ -20,6 +20,21 @@
   flex: 1;
   min-height: 0;
   display: flex;
-  gap: 18px;
+  gap: 6px;
   padding: 18px 30px 24px;
+}
+
+/* Both panes must be able to shrink below their content, or the flex basis
+   set by the split handle is ignored. */
+.tablePane {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+}
+
+.chatPane {
+  flex-grow: 0;
+  flex-shrink: 0;
+  min-width: 0;
+  display: flex;
 }

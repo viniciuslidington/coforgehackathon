@@ -20,7 +20,7 @@ from app.graphs.summary.state import Mode
 from app.schemas.meetings import StoredMeetingSummary, SummaryPage
 from app.schemas.transcripts import TranscriptSegment
 from app.services import priority
-from app.services.database import list_summaries, list_summaries_for_priority
+from app.services.database import get_summary, list_summaries, list_summaries_for_priority
 
 logger = logging.getLogger("meeting-insights")
 
@@ -157,6 +157,11 @@ def get_stored_summaries(
     page_slice = scored[start:start + page_size]
     items = [_row_to_summary(row, priority_score=score, priority_tier=tier) for score, tier, row in page_slice]
     return SummaryPage(items=items, total=total, page=page, page_size=page_size)
+
+def get_stored_summary(meeting_id: str) -> StoredMeetingSummary | None:
+    """One stored meeting overview, or None when it has not been processed."""
+    row = get_summary(meeting_id)
+    return _row_to_summary(row) if row else None
 
 def caption_to_segment(caption: Caption) -> TranscriptSegment:
     t = format_timestamp(timestamp_seconds(caption.start))
