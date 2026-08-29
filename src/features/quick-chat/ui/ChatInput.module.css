@@ -4,29 +4,6 @@
   background: var(--bg-0);
 }
 
-.suggestions {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 9px;
-  flex-wrap: wrap;
-}
-
-.suggestion {
-  padding: 5px 9px;
-  border-radius: 8px;
-  border: 1px solid var(--border-4);
-  background: var(--bg-5);
-  color: var(--text-muted);
-  font-size: 11.5px;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-.suggestion:hover {
-  border-color: var(--teal-border-l);
-  color: var(--text-secondary);
-}
-
 .inputRow {
   display: flex;
   gap: 8px;

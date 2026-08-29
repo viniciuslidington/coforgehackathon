@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import CORS_ORIGINS
-from app.routers import agent, meeting_summaries
+from app.routers import agent, meeting_summaries, quick_chat
 from app.services.database import initialize_database
 
 @asynccontextmanager
@@ -27,4 +27,5 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 app.include_router(meeting_summaries.router)
+app.include_router(quick_chat.router)
 app.include_router(agent.router)

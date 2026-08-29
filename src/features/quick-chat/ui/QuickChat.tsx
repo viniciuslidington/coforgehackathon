@@ -1,84 +1,91 @@
 'use client';
 
-import type { ContextLabel } from '@/entities/call/model/types';
-import { CONTEXTS, KEYPOINTS } from '@/entities/call/model/data';
-import { useChat } from '../model/useChat';
-import { ChatMessageBubble } from './ChatMessage';
+import { useEffect, useRef } from 'react';
+import type { MeetingScope, ScopePreset } from '@/entities/meeting/model/scope';
+import { ScopeSelector } from '@/features/meeting-scope/ui/ScopeSelector';
+import { AgentTrace } from '@/shared/ui/AgentTrace';
+import { ChatMessageBubble } from '@/shared/ui/ChatMessageBubble';
+import { useQuickChat } from '../model/useQuickChat';
+import { BriefingPanel } from './BriefingPanel';
 import { ChatInput } from './ChatInput';
 import styles from './QuickChat.module.css';
 
-const SUGGESTIONS = [
-  'Anything I must answer?',
-  'What changed in my book?',
-];
+interface QuickChatProps {
+  scope: MeetingScope | null;
+  preset: ScopePreset;
+  onSelectPreset: (preset: ScopePreset) => void;
+  range: { from: string; to: string };
+  onRangeFromChange: (value: string) => void;
+  onRangeToChange: (value: string) => void;
+  rangeIsComplete: boolean;
+  onOpenMeeting: (meetingId: string) => void;
+}
 
-export function QuickChat() {
-  const {
-    context,
-    messages,
-    draft,
-    setDraft,
-    selectContext,
-    sendMessage,
-    askSuggestion,
-  } = useChat();
+export function QuickChat({
+  scope,
+  preset,
+  onSelectPreset,
+  range,
+  onRangeFromChange,
+  onRangeToChange,
+  rangeIsComplete,
+  onOpenMeeting,
+}: QuickChatProps) {
+  const chat = useQuickChat(scope);
+  const bodyRef = useRef<HTMLDivElement>(null);
 
-  const keyPoints = KEYPOINTS[context] ?? [];
+  useEffect(() => {
+    bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight, behavior: 'smooth' });
+  }, [chat.messages, chat.steps]);
 
   return (
     <div className={styles.panel}>
-      {/* Header */}
       <div className={styles.header}>
         <div className={styles.headerRow}>
           <div className={styles.title}>Quick chat</div>
-          <div className={styles.contextLabel}>CONTEXT</div>
+          <div className={styles.scopeLabel}>SCOPE</div>
         </div>
-        <div className={styles.contextPills}>
-          {CONTEXTS.map(label => (
-            <button
-              key={label}
-              className={`${styles.ctxPill} ${context === label ? styles.ctxActive : ''}`}
-              onClick={() => selectContext(label as ContextLabel)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <ScopeSelector
+          preset={preset}
+          onSelectPreset={onSelectPreset}
+          range={range}
+          onRangeFromChange={onRangeFromChange}
+          onRangeToChange={onRangeToChange}
+          rangeIsComplete={rangeIsComplete}
+          resolution={chat.resolution}
+          loading={chat.briefingLoading}
+        />
       </div>
 
-      {/* Body */}
-      <div className={styles.body}>
-        {/* Key Points */}
-        <div className={styles.kpLabel}>KEY POINTS</div>
-        <div className={styles.kpList}>
-          {keyPoints.map(k => (
-            <div
-              key={k.label}
-              className={styles.kpBadge}
-              data-tone={k.tone}
-            >
-              {k.label}
-            </div>
-          ))}
-        </div>
+      <div className={styles.body} ref={bodyRef}>
+        <BriefingPanel
+          briefing={chat.briefing}
+          steps={chat.briefingSteps}
+          loading={chat.briefingLoading}
+          error={chat.briefingError}
+          onOpenMeeting={onOpenMeeting}
+        />
 
-        {/* Messages */}
-        <div className={styles.messages}>
-          {messages.map((m, i) => (
-            <ChatMessageBubble key={i} message={m} />
-          ))}
-        </div>
+        {chat.messages.length > 0 && (
+          <div className={styles.messages}>
+            {chat.messages.map((message, index) => (
+              <ChatMessageBubble
+                key={index}
+                message={message}
+                onOpenMeeting={onOpenMeeting}
+              />
+            ))}
+          </div>
+        )}
+
+        {chat.asking && <AgentTrace steps={chat.steps} />}
       </div>
 
-      {/* Input */}
       <ChatInput
-        value={draft}
-        onChange={setDraft}
-        onSend={sendMessage}
-        suggestions={SUGGESTIONS.map(label => ({
-          label,
-          onAsk: () => askSuggestion(label),
-        }))}
+        value={chat.draft}
+        onChange={chat.setDraft}
+        onSend={chat.sendMessage}
+        disabled={chat.asking || !scope}
       />
     </div>
   );

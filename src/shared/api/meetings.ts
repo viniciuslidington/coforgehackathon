@@ -1,6 +1,6 @@
-import type { MeetingPeriod, MeetingSegment, MeetingSummaryPage, SortKey } from '@/entities/meeting/model/types';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_MEETING_API_URL ?? 'http://localhost:8000';
+import type { MeetingPeriod, MeetingSegment, MeetingSummary, MeetingSummaryPage, SortKey } from '@/entities/meeting/model/types';
+import { API_BASE_URL } from './config';
+import { readSseStream } from './sse';
 
 export async function syncMeetings(): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/sync-meetings`, { method: 'POST' });
@@ -26,6 +26,14 @@ export async function getMeetingSummaries(
     throw new Error(`Could not load meetings (${response.status}).`);
   }
   return response.json() as Promise<MeetingSummaryPage>;
+}
+
+export async function getMeetingById(meetingId: string, signal?: AbortSignal): Promise<MeetingSummary> {
+  const response = await fetch(`${API_BASE_URL}/meeting-summaries/${meetingId}`, { signal });
+  if (!response.ok) {
+    throw new Error(`Could not load meeting (${response.status}).`);
+  }
+  return response.json() as Promise<MeetingSummary>;
 }
 
 export async function getMeetingTranscript(meetingId: string, signal?: AbortSignal): Promise<MeetingSegment[]> {
@@ -57,39 +65,10 @@ export async function askMeetingQuestion(
   if (!response.ok) {
     throw new Error(`Could not get an answer (${response.status}).`);
   }
-  if (!response.body) {
-    throw new Error('The answer stream is unavailable in this browser.');
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-  let terminalEventReceived = false;
-
-  const emitFrames = (flush = false) => {
-    buffer = buffer.replaceAll('\r\n', '\n');
-    const frames = buffer.split('\n\n');
-    buffer = flush ? '' : (frames.pop() ?? '');
-    for (const frame of frames) {
-      const payload = frame
-        .split('\n')
-        .filter(line => line.startsWith('data:'))
-        .map(line => line.slice(5).trimStart())
-        .join('\n');
-      if (!payload) continue;
-      const event = JSON.parse(payload) as MeetingQuestionEvent;
-      if (event.type === 'answer' || event.type === 'error') terminalEventReceived = true;
-      onEvent(event);
-    }
-  };
-
-  while (true) {
-    const { done, value } = await reader.read();
-    buffer += decoder.decode(value, { stream: !done });
-    emitFrames(done);
-    if (done) break;
-  }
-  if (!terminalEventReceived) {
-    throw new Error('The answer stream ended before returning a result.');
-  }
+  await readSseStream<MeetingQuestionEvent>(
+    response,
+    onEvent,
+    event => event.type === 'answer' || event.type === 'error',
+    'The answer stream ended before returning a result.',
+  );
 }

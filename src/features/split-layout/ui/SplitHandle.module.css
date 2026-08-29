@@ -1,0 +1,73 @@
+.handle {
+  flex: 0 0 12px;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: col-resize;
+  /* Keeps the pointer stream on this element for the whole drag. */
+  touch-action: none;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+
+.handle:hover,
+.handle:focus-visible {
+  background: var(--bg-5);
+}
+
+.handle:focus-visible {
+  outline: 1px solid var(--teal-border);
+  outline-offset: 0;
+}
+
+.grip {
+  width: 3px;
+  height: 34px;
+  border-radius: 999px;
+  background: var(--border-6);
+  transition: background 0.15s ease, height 0.15s ease;
+}
+
+.handle:hover .grip,
+.handle:focus-visible .grip {
+  background: var(--teal-border);
+  height: 56px;
+}
+
+.dragging {
+  background: var(--bg-5);
+}
+
+.dragging .grip {
+  background: var(--teal-pale);
+  height: 72px;
+}
+
+/* Table hidden: the handle is a button back to the default layout. */
+.restore {
+  flex: 0 0 18px;
+  cursor: pointer;
+  background: var(--bg-5);
+  border: 1px solid var(--border-3);
+}
+
+.restore:hover,
+.restore:focus-visible {
+  background: var(--teal-bg);
+  border-color: var(--teal-border);
+}
+
+.chevron {
+  font-size: 15px;
+  line-height: 1;
+  color: var(--text-dim);
+}
+
+.restore:hover .chevron,
+.restore:focus-visible .chevron {
+  color: var(--teal-pale);
+}

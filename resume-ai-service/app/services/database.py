@@ -1,14 +1,24 @@
-"""Minimal SQLite persistence for generated meeting overview rows."""
+"""Minimal SQLite persistence for generated meeting overview rows.
+
+Note the one deviation from this module's conventions: `meeting_summaries`
+stores list columns as comma-joined text, but `quick_chat_briefings` stores
+them as JSON. Key points and referenced meetings are objects, not flat
+strings, so CSV cannot carry them.
+"""
 from __future__ import annotations
 
+import json
 import sqlite3
 from contextlib import contextmanager
 from datetime import UTC, datetime
-from typing import Iterator
+from typing import Iterator, Sequence
 
 from app.core.config import DATABASE_PATH
 
-SCHEMA = """
+BRIEFING_CACHE_LIMIT = 10
+
+SCHEMA_STATEMENTS = (
+    """
     CREATE TABLE IF NOT EXISTS meeting_summaries (
         meeting_id TEXT PRIMARY KEY,
         title TEXT NOT NULL,
@@ -20,7 +30,29 @@ SCHEMA = """
         refreshed_at TEXT NOT NULL,
         topic_embedding BLOB
     )
-"""
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS quick_chat_briefings (
+        fingerprint TEXT PRIMARY KEY,
+        selection_json TEXT NOT NULL,
+        meeting_ids TEXT NOT NULL,
+        meeting_count INTEGER NOT NULL,
+        range_start TEXT,
+        range_end TEXT,
+        summary TEXT NOT NULL,
+        key_points TEXT NOT NULL,
+        referenced_meetings TEXT NOT NULL,
+        model TEXT NOT NULL,
+        prompt_version TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        last_used_at TEXT NOT NULL
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_quick_chat_briefings_last_used
+        ON quick_chat_briefings(last_used_at DESC)
+    """,
+)
 
 @contextmanager
 def connection() -> Iterator[sqlite3.Connection]:
@@ -28,8 +60,9 @@ def connection() -> Iterator[sqlite3.Connection]:
     conn.row_factory = sqlite3.Row
     try:
         # A running development server can encounter a newly created SQLite
-        # file. Ensure every operation has the table it depends on.
-        conn.execute(SCHEMA)
+        # file. Ensure every operation has the tables it depends on.
+        for statement in SCHEMA_STATEMENTS:
+            conn.execute(statement)
         columns = {row["name"] for row in conn.execute("PRAGMA table_info(meeting_summaries)")}
         if "keywords" not in columns:
             conn.execute("ALTER TABLE meeting_summaries ADD COLUMN keywords TEXT NOT NULL DEFAULT ''")
@@ -111,3 +144,122 @@ def delete_summary(meeting_id: str) -> bool:
     with connection() as conn:
         cursor = conn.execute("DELETE FROM meeting_summaries WHERE meeting_id = ?", (meeting_id,))
         return cursor.rowcount > 0
+
+SUMMARY_COLUMNS = """
+    meeting_id, title, meeting_date, participants, simple_summary,
+    keywords, duration_seconds, refreshed_at, topic_embedding
+"""
+
+def max_meeting_date() -> str | None:
+    """The newest meeting_date on record, or None when there are no meetings."""
+    with connection() as conn:
+        return conn.execute("SELECT MAX(meeting_date) FROM meeting_summaries").fetchone()[0]
+
+def list_summaries_between(*, date_from: str, date_to: str) -> list[dict[str, object]]:
+    """Every summary in an inclusive date range, newest first.
+
+    Both bounds are inclusive because meeting_date is a date-only string;
+    an exclusive upper bound would silently drop the final day.
+    """
+    with connection() as conn:
+        rows = conn.execute(f"""
+            SELECT {SUMMARY_COLUMNS} FROM meeting_summaries
+            WHERE meeting_date >= ? AND meeting_date <= ?
+            ORDER BY meeting_date DESC, refreshed_at DESC
+        """, (date_from, date_to)).fetchall()
+    return [dict(row) for row in rows]
+
+def list_summaries_by_ids(meeting_ids: Sequence[str]) -> list[dict[str, object]]:
+    """Summaries for the given ids, unordered — the caller restores its order."""
+    if not meeting_ids:
+        return []
+    placeholders = ",".join("?" * len(meeting_ids))
+    with connection() as conn:
+        rows = conn.execute(f"""
+            SELECT {SUMMARY_COLUMNS} FROM meeting_summaries
+            WHERE meeting_id IN ({placeholders})
+        """, tuple(meeting_ids)).fetchall()
+    return [dict(row) for row in rows]
+
+def get_cached_briefing(fingerprint: str) -> dict[str, object] | None:
+    """Read a cached briefing, marking it as most recently used."""
+    now = datetime.now(UTC).isoformat()
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM quick_chat_briefings WHERE fingerprint = ?", (fingerprint,)
+        ).fetchone()
+        if row is None:
+            return None
+        conn.execute(
+            "UPDATE quick_chat_briefings SET last_used_at = ? WHERE fingerprint = ?",
+            (now, fingerprint),
+        )
+    briefing = dict(row)
+    briefing["meeting_ids"] = json.loads(briefing["meeting_ids"])
+    briefing["key_points"] = json.loads(briefing["key_points"])
+    briefing["referenced_meetings"] = json.loads(briefing["referenced_meetings"])
+    briefing["last_used_at"] = now
+    return briefing
+
+def save_briefing(
+    *,
+    fingerprint: str,
+    selection_json: str,
+    meeting_ids: Sequence[str],
+    meeting_count: int,
+    range_start: str | None,
+    range_end: str | None,
+    summary: str,
+    key_points: list[dict[str, object]],
+    referenced_meetings: list[dict[str, object]],
+    model: str,
+    prompt_version: str,
+    limit: int = BRIEFING_CACHE_LIMIT,
+) -> None:
+    """Store a briefing and evict all but the `limit` most recently used."""
+    now = datetime.now(UTC).isoformat()
+    with connection() as conn:
+        conn.execute("""
+            INSERT INTO quick_chat_briefings (
+                fingerprint, selection_json, meeting_ids, meeting_count,
+                range_start, range_end, summary, key_points, referenced_meetings,
+                model, prompt_version, created_at, last_used_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(fingerprint) DO UPDATE SET
+                selection_json=excluded.selection_json,
+                summary=excluded.summary,
+                key_points=excluded.key_points,
+                referenced_meetings=excluded.referenced_meetings,
+                last_used_at=excluded.last_used_at
+        """, (
+            fingerprint, selection_json, json.dumps(list(meeting_ids)), meeting_count,
+            range_start, range_end, summary, json.dumps(key_points),
+            json.dumps(referenced_meetings), model, prompt_version, now, now,
+        ))
+        _evict_old_briefings(conn, limit)
+
+def _evict_old_briefings(conn: sqlite3.Connection, limit: int) -> int:
+    """Keep only the `limit` most recently used briefings.
+
+    LRU rather than insertion order, so the presets a user actually cycles
+    through stay cached even as one-off date ranges come and go.
+    """
+    cursor = conn.execute("""
+        DELETE FROM quick_chat_briefings WHERE fingerprint NOT IN (
+            SELECT fingerprint FROM quick_chat_briefings
+            ORDER BY last_used_at DESC, created_at DESC LIMIT ?)
+    """, (limit,))
+    return cursor.rowcount
+
+def evict_old_briefings(limit: int = BRIEFING_CACHE_LIMIT) -> int:
+    with connection() as conn:
+        return _evict_old_briefings(conn, limit)
+
+def list_briefings(limit: int = BRIEFING_CACHE_LIMIT) -> list[dict[str, object]]:
+    with connection() as conn:
+        rows = conn.execute("""
+            SELECT fingerprint, meeting_count, range_start, range_end,
+                   created_at, last_used_at
+            FROM quick_chat_briefings ORDER BY last_used_at DESC LIMIT ?
+        """, (limit,)).fetchall()
+    return [dict(row) for row in rows]

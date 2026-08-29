@@ -46,3 +46,7 @@ __pycache__
 
 # subagent-driven-development scratch workspace
 .superpowers/
+
+# SQLite runtime artifacts (the .db itself is tracked; these are not)
+*.db-shm
+*.db-wal

@@ -6,7 +6,6 @@ transcript, and per-meeting Q&A, all backed by what's stored in the database.
 from __future__ import annotations
 
 import logging
-import json
 from datetime import date
 from typing import Iterator, Literal
 
@@ -23,11 +22,12 @@ from app.graphs.meeting_chat.prompts import (
     TOOL_STEP_LABELS,
 )
 from app.schemas.agent import AnswerEvent, ErrorEvent, QuestionRequest, StepEvent
-from app.schemas.meetings import RefreshResponse, SummaryPage
+from app.schemas.meetings import RefreshResponse, StoredMeetingSummary, SummaryPage
 from app.schemas.transcripts import TranscriptSegment
 from app.services.database import delete_summary, get_summary, summary_exists, summary_has_keywords, upsert_summary
-from app.services.meeting_service import caption_to_segment, compute_topic_embedding_blob, execute_overview, get_stored_summaries
+from app.services.meeting_service import caption_to_segment, compute_topic_embedding_blob, execute_overview, get_stored_summaries, get_stored_summary
 from app.services.r2_storage import get_r2_vtt_content, list_r2_vtt_files
+from app.services.sse import message_text, sse
 from app.services.transcripts import transcript_repository
 
 logger = logging.getLogger("meeting-insights")
@@ -125,6 +125,18 @@ def get_meeting_summaries(
     """
     return get_stored_summaries(page, page_size, period, topics, sort)
 
+@router.get("/meeting-summaries/{meeting_id}", response_model=StoredMeetingSummary)
+def get_meeting_summary(meeting_id: str) -> StoredMeetingSummary:
+    """Return one stored meeting overview.
+
+    Lets the UI open a meeting cited in a chat answer even when that meeting
+    is not on the currently rendered page of the table.
+    """
+    summary = get_stored_summary(meeting_id)
+    if summary is None:
+        raise HTTPException(status_code=404, detail=f"Meeting '{meeting_id}' not found.")
+    return summary
+
 @router.get("/meeting-summaries/{meeting_id}/transcript", response_model=list[TranscriptSegment])
 def get_meeting_transcript(meeting_id: str) -> list[TranscriptSegment]:
     """Return timestamped, speaker-attributed segments for a stored meeting."""
@@ -132,21 +144,6 @@ def get_meeting_transcript(meeting_id: str) -> list[TranscriptSegment]:
     if captions is None:
         raise HTTPException(status_code=404, detail=f"No transcript found for meeting '{meeting_id}'.")
     return [caption_to_segment(caption) for caption in captions]
-
-def _sse(event: StepEvent | AnswerEvent | ErrorEvent) -> str:
-    return f"data: {json.dumps(event.model_dump(), ensure_ascii=False)}\n\n"
-
-
-def _message_text(message: AIMessage) -> str:
-    if isinstance(message.content, str):
-        return message.content
-    pieces = [
-        str(part.get("text", ""))
-        for part in message.content
-        if isinstance(part, dict) and part.get("type") == "text"
-    ]
-    return "".join(pieces)
-
 
 @router.post("/meeting-summaries/{meeting_id}/questions")
 def ask_meeting_question(meeting_id: str, request: QuestionRequest) -> StreamingResponse:
@@ -185,7 +182,7 @@ def ask_meeting_question(meeting_id: str, request: QuestionRequest) -> Streaming
     config: RunnableConfig = {"configurable": {"thread_id": request.session_id}}
 
     def event_stream() -> Iterator[str]:
-        yield _sse(StepEvent(label=INITIAL_STEP_LABEL))
+        yield sse(StepEvent(label=INITIAL_STEP_LABEL))
         try:
             for update in chat_graph.stream(graph_input, config=config, stream_mode="updates"):
                 agent_update = update.get("agent")
@@ -196,22 +193,22 @@ def ask_meeting_question(meeting_id: str, request: QuestionRequest) -> Streaming
                         if message.tool_calls:
                             for tool_call in message.tool_calls:
                                 tool_name = tool_call.get("name", "")
-                                label = TOOL_STEP_LABELS.get(tool_name, "Consultando uma ferramenta…")
-                                yield _sse(StepEvent(label=label))
+                                label = TOOL_STEP_LABELS.get(tool_name, "Consulting a tool…")
+                                yield sse(StepEvent(label=label))
                         else:
-                            yield _sse(StepEvent(label=SYNTHESIS_STEP_LABEL))
+                            yield sse(StepEvent(label=SYNTHESIS_STEP_LABEL))
                 synthesis_update = update.get("synthesize")
                 if synthesis_update:
                     for message in synthesis_update.get("messages", []):
                         if isinstance(message, AIMessage):
-                            yield _sse(AnswerEvent(
-                                text=_message_text(message),
+                            yield sse(AnswerEvent(
+                                text=message_text(message),
                                 caption_count=len(captions),
                             ))
         except Exception as exc:
             logger.exception("Meeting chat stream failed for meeting=%s", meeting_id)
             detail = str(exc) if isinstance(exc, RuntimeError) else "Could not complete the response."
-            yield _sse(ErrorEvent(detail=detail))
+            yield sse(ErrorEvent(detail=detail))
 
     return StreamingResponse(
         event_stream(),

@@ -1,3 +1,5 @@
+import type { ReferencedMeeting } from './scope';
+
 export type MeetingPeriod = 'day' | 'week' | '30d' | 'all';
 
 export type Priority = 'urgent' | 'high' | 'normal';
@@ -44,4 +46,9 @@ export interface MeetingSegment {
 export interface ChatMessage {
   role: 'user' | 'ai';
   text: string;
+  /**
+   * Meetings the agent cited in `text` via `[[meeting:<id>]]` markers.
+   * Only the Quick Chat sets this; the per-meeting chat leaves it undefined.
+   */
+  meetings?: ReferencedMeeting[];
 }

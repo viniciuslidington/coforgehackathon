@@ -1,18 +1,15 @@
 """Persistent LangGraph agent for Q&A about one meeting."""
 from __future__ import annotations
 
-import atexit
-from contextlib import AbstractContextManager
 from typing import Any
 from uuid import uuid4
 
 from langchain_core.messages import AIMessage, HumanMessage
-from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode
 
-from app.core.config import DATABASE_PATH
+from app.graphs.checkpointer import get_checkpointer
 from app.graphs.meeting_chat.nodes import run_agent, synthesize_answer
 from app.graphs.meeting_chat.state import ChatState
 from app.graphs.meeting_chat.tools import MEETING_CHAT_TOOLS
@@ -39,10 +36,7 @@ def build_chat_graph(checkpointer: Any = None) -> CompiledStateGraph:
     return workflow.compile(checkpointer=checkpointer)
 
 
-_checkpoint_context: AbstractContextManager[SqliteSaver] = SqliteSaver.from_conn_string(str(DATABASE_PATH))
-_checkpointer = _checkpoint_context.__enter__()
-atexit.register(_checkpoint_context.__exit__, None, None, None)
-chat_graph = build_chat_graph(_checkpointer)
+chat_graph = build_chat_graph(get_checkpointer())
 
 
 def answer_from_transcript(transcript: str, question: str) -> str:

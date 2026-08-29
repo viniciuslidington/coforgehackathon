@@ -2,7 +2,8 @@
 
 import { useEffect, useRef } from 'react';
 import type { ChatMessage } from '@/entities/meeting/model/types';
-import { ChatMessageBubble } from '@/features/quick-chat/ui/ChatMessage';
+import { ChatMessageBubble } from '@/shared/ui/ChatMessageBubble';
+import { AgentTrace } from '@/shared/ui/AgentTrace';
 import styles from './DetailChat.module.css';
 
 interface DetailChatProps {
@@ -40,16 +41,7 @@ export function DetailChat({
         {messages.map((m, i) => (
           <ChatMessageBubble key={i} message={m} />
         ))}
-        {asking && steps.length > 0 && (
-          <div className={styles.trace} aria-live="polite" aria-label="Agent activity">
-            {steps.map((step, index) => (
-              <div className={styles.traceStep} key={`${index}-${step}`}>
-                <span className={styles.traceDot} aria-hidden="true" />
-                <span>{step}</span>
-              </div>
-            ))}
-          </div>
-        )}
+        {asking && <AgentTrace steps={steps} />}
       </div>
 
       {/* Input */}
