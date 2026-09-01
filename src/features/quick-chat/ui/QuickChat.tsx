@@ -19,6 +19,12 @@ interface QuickChatProps {
   onRangeToChange: (value: string) => void;
   rangeIsComplete: boolean;
   onOpenMeeting: (meetingId: string) => void;
+  /** Open a meeting scrolled to a moment the answer cited. */
+  onOpenMeetingAt: (
+    meetingId: string,
+    fromSeconds: number | null,
+    toSeconds: number | null,
+  ) => void;
 }
 
 export function QuickChat({
@@ -30,6 +36,7 @@ export function QuickChat({
   onRangeToChange,
   rangeIsComplete,
   onOpenMeeting,
+  onOpenMeetingAt,
 }: QuickChatProps) {
   const chat = useQuickChat(scope);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -73,6 +80,7 @@ export function QuickChat({
                 key={index}
                 message={message}
                 onOpenMeeting={onOpenMeeting}
+                onOpenMeetingAt={onOpenMeetingAt}
               />
             ))}
           </div>

@@ -12,7 +12,7 @@ import { useTopics } from '@/features/call-filters/model/useTopics';
 import { useMeetingScope } from '@/features/meeting-scope/model/useMeetingScope';
 import { useSplitLayout } from '@/features/split-layout/model/useSplitLayout';
 import { SplitHandle } from '@/features/split-layout/ui/SplitHandle';
-import { useMeetingDetail } from '@/features/call-detail/model/useMeetingDetail';
+import { useMeetingDetail, type TranscriptSeek } from '@/features/call-detail/model/useMeetingDetail';
 import { MeetingDetailModal } from '@/features/call-detail/ui/MeetingDetailModal';
 import { getMeetingById } from '@/shared/api/meetings';
 import styles from './page.module.css';
@@ -53,19 +53,33 @@ export default function ShiftBriefingPage() {
     reset: resetSplit, handleProps,
   } = useSplitLayout();
 
-  const openMeetingById = useCallback(async (meetingId: string) => {
+  const openMeetingById = useCallback(async (
+    meetingId: string,
+    seek: TranscriptSeek | null = null,
+  ) => {
     const onScreen = visibleMeetings.find(meeting => meeting.meeting_id === meetingId);
     if (onScreen) {
-      detail.openMeeting(onScreen);
+      detail.openMeeting(onScreen, seek);
       return;
     }
     try {
       // A cited meeting may sit outside the current page of the table.
-      detail.openMeeting(await getMeetingById(meetingId));
+      detail.openMeeting(await getMeetingById(meetingId), seek);
     } catch {
       // Nothing actionable for the user here; leave the modal closed.
     }
   }, [visibleMeetings, detail]);
+
+  // A Quick Chat citation names a meeting and a moment inside it. The seek
+  // rides along with the open so it is in place before the transcript lands.
+  const openMeetingAt = useCallback((
+    meetingId: string,
+    from: number | null,
+    to: number | null,
+  ) => openMeetingById(
+    meetingId,
+    from === null ? null : { from, to, nonce: Date.now() },
+  ), [openMeetingById]);
 
   return (
     <div className={styles.shell}>
@@ -109,6 +123,7 @@ export default function ShiftBriefingPage() {
               onRangeToChange={scope.setRangeTo}
               rangeIsComplete={scope.rangeIsComplete}
               onOpenMeeting={openMeetingById}
+            onOpenMeetingAt={openMeetingAt}
             />
           </div>
         </div>
@@ -126,6 +141,8 @@ export default function ShiftBriefingPage() {
             onClose={detail.closeMeeting}
             onDraftChange={detail.setDraft}
             onSend={detail.sendMessage}
+            seek={detail.seek}
+            onSeek={detail.seekTo}
           />
         )}
       </main>

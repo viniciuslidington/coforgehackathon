@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { ChatMessage, MeetingSegment, MeetingSummary } from '@/entities/meeting/model/types';
 import { formatMeetingDate } from '@/entities/meeting/lib/helpers';
 import { findSegmentAt, segmentsInRange } from '@/entities/meeting/lib/transcriptTime';
+import type { TranscriptSeek } from '../model/useMeetingDetail';
 import { MeetingTimeline } from './MeetingTimeline';
 import { MeetingTranscript } from './MeetingTranscript';
 import { DetailChat } from './DetailChat';
@@ -21,6 +22,13 @@ interface MeetingDetailModalProps {
   onClose: () => void;
   onDraftChange: (value: string) => void;
   onSend: () => void;
+  /**
+   * The cited moment to scroll to, owned by `useMeetingDetail` so that opening
+   * another meeting clears it. May already be set on the first render, before
+   * the transcript has loaded.
+   */
+  seek: TranscriptSeek | null;
+  onSeek: (fromSeconds: number, toSeconds: number | null) => void;
 }
 
 export function MeetingDetailModal({
@@ -35,18 +43,14 @@ export function MeetingDetailModal({
   onClose,
   onDraftChange,
   onSend,
+  seek,
+  onSeek,
 }: MeetingDetailModalProps) {
   const [mode, setMode] = useState<'timeline' | 'transcript'>('timeline');
-  // Where a chat citation last pointed. The nonce makes clicking the same
-  // citation twice a new value, so the scroll effect re-runs.
-  const [seek, setSeek] = useState<{ from: number; to: number | null; nonce: number } | null>(null);
-
-  const onSeek = useCallback((from: number, to: number | null) => {
-    // Set from an event handler, never an effect.
-    setSeek(previous => ({ from, to, nonce: (previous?.nonce ?? 0) + 1 }));
-  }, []);
-
-  // Derived, not stored: recomputing beats keeping a second copy in sync.
+  // Derived, not stored: recomputing beats keeping a second copy in sync. A
+  // seek set before the transcript arrived resolves here the moment it does,
+  // and the list mounts with `focusIndex` already set — so its scroll effect
+  // fires on mount with no extra plumbing.
   const activeIndexes = useMemo(
     () => (seek ? segmentsInRange(segments, seek.from, seek.to) : undefined),
     [segments, seek],
