@@ -59,6 +59,22 @@ FINAL_ANSWER_REQUEST = "Now synthesize only the final answer for the user."
 INITIAL_STEP_LABEL = "Analyzing the question…"
 SYNTHESIS_STEP_LABEL = "Synthesizing the final answer…"
 
+# Shown when the agent never stopped calling tools and the graph ran out of
+# steps. Phrased as something the user can act on, because the alternative —
+# LangGraph's own message about a recursion limit — describes our plumbing.
+CHAT_GAVE_UP_MESSAGE = (
+    "I could not finish that one — it took too many lookups in this meeting. "
+    "Try asking about one point at a time."
+)
+
+# The synthesis step can come back with nothing — a model that spent its whole
+# token budget on thinking returns empty content rather than an error. An empty
+# bubble looks like a broken interface, so say what happened instead.
+CHAT_EMPTY_ANSWER_MESSAGE = (
+    "I could not put an answer together for that one. Try asking about one point "
+    "at a time."
+)
+
 TOOL_STEP_LABELS = {
     "get_meeting_metadata": "Looking up meeting details…",
     "search_transcript_keyword": "Searching for a quote in the meeting…",

@@ -1,6 +1,7 @@
 import { Fragment, type ReactNode } from 'react';
 import type { ReferencedMeeting } from '@/entities/meeting/model/scope';
 import { renderInline, type InlineRule } from '@/shared/lib/richText';
+import { formatClock, parseClockSeconds } from './transcriptTime';
 
 /**
  * The agent writes `[[meeting:<id>]]` wherever it names a meeting, and the
@@ -104,6 +105,61 @@ export function meetingMarkerRule(
         );
       }
       return <Fragment key={key}>{links}</Fragment>;
+    },
+  };
+}
+
+/**
+ * A citation that names both a meeting and a moment inside it:
+ * `[[meeting:<id>@<start>-<end>]]`.
+ *
+ * Quick Chat needs this because one answer spans many meetings, so a bare
+ * timestamp there cannot say which transcript to open. The server has already
+ * checked the moment against that meeting's real cues, so anything arriving
+ * here is safe to link.
+ *
+ * Must be ordered BEFORE `meetingMarkerRule`: both patterns match this form at
+ * the same index, and the scanner breaks ties by array order. Behind it, the
+ * plain rule would claim the match, fail to resolve the `@` suffix as an id,
+ * and delete the citation.
+ */
+const TIMED_MARKER = /\[\[\s*meeting\s*:\s*([^[\]\n@]+?)\s*@\s*([^[\]\n]+?)\s*\]\]/g;
+const RANGE = /^(.+?)\s*[–—-]\s*(.+)$/;
+
+export function meetingTimeRule(
+  meetings: ReferencedMeeting[],
+  onOpenAt: (meetingId: string, fromSeconds: number | null, toSeconds: number | null) => void,
+  linkClassName?: string,
+): InlineRule {
+  const byId = new Map(meetings.map(meeting => [meeting.meeting_id, meeting]));
+
+  return {
+    pattern: new RegExp(TIMED_MARKER.source, 'g'),
+    render: (match, key) => {
+      const meeting = byId.get(match[1]);
+      // Consumed, not shown: an unresolvable citation is not prose.
+      if (!meeting) return '';
+
+      const parts = RANGE.exec(match[2]);
+      const from = parseClockSeconds(parts ? parts[1] : match[2]);
+      const to = parts ? parseClockSeconds(parts[2]) : null;
+
+      // The meeting still opens even if the moment is unreadable.
+      const label = from === null
+        ? meeting.title
+        : `${meeting.title} ${formatClock(from)}${to === null ? '' : `–${formatClock(to)}`}`;
+
+      return (
+        <button
+          key={key}
+          type="button"
+          className={linkClassName}
+          title={from === null ? 'Open this meeting' : 'Open this meeting at this moment'}
+          onClick={() => onOpenAt(meeting.meeting_id, from, to)}
+        >
+          {label}
+        </button>
+      );
     },
   };
 }

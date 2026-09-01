@@ -144,3 +144,25 @@
   color: var(--teal-pale);
   text-decoration-color: currentColor;
 }
+
+/* A Quick Chat citation naming both a meeting and a moment. Reads as the
+   meeting name, with the timecode carried along in mono so the two halves stay
+   visually distinct inside one control. */
+.meetingTimeLink {
+  padding: 0 1px;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--teal-light);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: var(--teal-border);
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+
+.meetingTimeLink:hover,
+.meetingTimeLink:focus-visible {
+  color: var(--teal-pale);
+  text-decoration-color: currentColor;
+}

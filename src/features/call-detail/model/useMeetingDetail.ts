@@ -2,6 +2,14 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { ChatMessage, MeetingSegment, MeetingSummary } from '@/entities/meeting/model/types';
+
+/** A moment in the open meeting's transcript to scroll to and highlight. */
+export interface TranscriptSeek {
+  from: number;
+  to: number | null;
+  /** Bumped per request so following the same citation twice re-scrolls. */
+  nonce: number;
+}
 import { askMeetingQuestion, getMeetingTranscript } from '@/shared/api/meetings';
 
 export function useMeetingDetail() {
@@ -14,6 +22,10 @@ export function useMeetingDetail() {
   const [asking, setAsking] = useState(false);
   const [steps, setSteps] = useState<string[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  // Owned here rather than in the modal so that opening another meeting clears
+  // it along with the rest of the per-meeting state. Left in the modal, a
+  // previous meeting's seek would highlight an unrelated cue in the next one.
+  const [seek, setSeek] = useState<TranscriptSeek | null>(null);
   const questionController = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -38,9 +50,10 @@ export function useMeetingDetail() {
     };
   }, [selectedMeeting]);
 
-  const openMeeting = useCallback((meeting: MeetingSummary) => {
+  const openMeeting = useCallback((meeting: MeetingSummary, initialSeek?: TranscriptSeek | null) => {
     questionController.current?.abort();
     setSelectedMeeting(meeting);
+    setSeek(initialSeek ?? null);
     setSegments([]);
     setSegmentsLoading(true);
     setSegmentsError(null);
@@ -58,10 +71,15 @@ export function useMeetingDetail() {
     questionController.current = null;
     setSelectedMeeting(null);
     setSegments([]);
+    setSeek(null);
     setMessages([]);
     setSteps([]);
     setSessionId(null);
     setAsking(false);
+  }, []);
+
+  const seekTo = useCallback((from: number, to: number | null) => {
+    setSeek(previous => ({ from, to, nonce: (previous?.nonce ?? 0) + 1 }));
   }, []);
 
   const sendMessage = useCallback(async () => {
@@ -120,8 +138,10 @@ export function useMeetingDetail() {
     setDraft,
     asking,
     steps,
+    seek,
     openMeeting,
     closeMeeting,
     sendMessage,
+    seekTo,
   } as const;
 }

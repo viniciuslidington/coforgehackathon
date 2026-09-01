@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from langchain_core.messages import AIMessage
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode
@@ -12,15 +11,13 @@ from app.graphs.checkpointer import get_checkpointer
 from app.graphs.quick_chat.nodes import run_quick_chat_agent, synthesize_quick_chat_answer
 from app.graphs.quick_chat.state import QuickChatState
 from app.graphs.quick_chat.tools import QUICK_CHAT_TOOLS
+from app.graphs.tool_budget import MAX_TOOL_ROUNDS, recursion_limit_for, route_after_agent
 
-# Bounds a runaway tool loop. Each iteration re-sends the catalog, so an
-# unbounded loop is expensive as well as slow.
-QUICK_CHAT_RECURSION_LIMIT = 12
+QUICK_CHAT_RECURSION_LIMIT = recursion_limit_for(MAX_TOOL_ROUNDS)
 
 
 def _route_after_agent(state: QuickChatState) -> str:
-    message = state.get("messages", [])[-1]
-    return "tools" if isinstance(message, AIMessage) and message.tool_calls else "synthesize"
+    return route_after_agent(state.get("messages", []), agent="Quick chat")
 
 
 def build_quick_chat_graph(checkpointer: Any = None) -> CompiledStateGraph:

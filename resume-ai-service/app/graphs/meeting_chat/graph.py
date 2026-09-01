@@ -13,11 +13,14 @@ from app.graphs.checkpointer import get_checkpointer
 from app.graphs.meeting_chat.nodes import run_agent, synthesize_answer
 from app.graphs.meeting_chat.state import ChatState
 from app.graphs.meeting_chat.tools import MEETING_CHAT_TOOLS
+from app.graphs.tool_budget import MAX_TOOL_ROUNDS, recursion_limit_for, route_after_agent
+
+
+MEETING_CHAT_RECURSION_LIMIT = recursion_limit_for(MAX_TOOL_ROUNDS)
 
 
 def _route_after_agent(state: ChatState) -> str:
-    message = state.get("messages", [])[-1]
-    return "tools" if isinstance(message, AIMessage) and message.tool_calls else "synthesize"
+    return route_after_agent(state.get("messages", []), agent="Meeting chat")
 
 
 def build_chat_graph(checkpointer: Any = None) -> CompiledStateGraph:
@@ -49,7 +52,10 @@ def answer_from_transcript(transcript: str, question: str) -> str:
             "metadata": {},
             "messages": [HumanMessage(content=question)],
         },
-        config={"configurable": {"thread_id": str(uuid4())}},
+        config={
+            "configurable": {"thread_id": str(uuid4())},
+            "recursion_limit": MEETING_CHAT_RECURSION_LIMIT,
+        },
     )
     message = result["messages"][-1]
     if not isinstance(message, AIMessage):

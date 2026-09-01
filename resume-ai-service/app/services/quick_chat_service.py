@@ -19,9 +19,11 @@ from app.graphs.quick_chat.prompts import (
     MAX_INLINE_CITATIONS,
     MEETING_MARKER,
 )
+from app.core.vtt import Caption
 from app.schemas.quick_chat import BriefingResponse, KeyPoint, ReferencedMeeting
 from app.services.database import get_cached_briefing, save_briefing
 from app.services.meeting_scope import MeetingCard, ResolvedScope
+from app.services.transcripts import transcript_repository
 
 logger = logging.getLogger("meeting-insights")
 
@@ -31,6 +33,64 @@ UNKNOWN_MEETING_TEXT = "the meeting"
 # words. Used to tell a citation the model mangled from bracketed prose that
 # was never a citation at all.
 MEETING_ID_SHAPE = re.compile(r"^\d{2,}[\w.-]*$")
+
+# A Quick Chat answer spans many meetings, so a bare timestamp in it is
+# ambiguous. The agent is asked to write `[[meeting:<id>@<start>-<end>]]`, which
+# rides inside the existing marker grammar: `MEETING_MARKER`'s body class
+# already admits `@ : . -`, and `VALID_MARKER`/`CITATION_RUN` both match the
+# longer form, so the debris sweep and the citation cap keep working unchanged.
+TIME = r"(?:\d{1,2}:)?\d{1,2}:\d{2}(?:[.,]\d{1,3})?"
+# En dash is what the transcript feeds the model; the others are it improvising.
+DASH = r"\s*[\u2013\u2014-]\s*"
+TIME_SUFFIX = re.compile(rf"^\s*({TIME})(?:{DASH}({TIME}))?\s*$")
+
+# A citation the model wrote without attaching a meeting. Excludes `[[...]]` so
+# it can never claim half of a real marker.
+MARKER_OR_BARE_TIME = re.compile(
+    r"(?P<marker>\[\[meeting:(?P<mid>[^\]\n]+)\]\])"
+    rf"|(?P<bare>(?<!\[)\[\s*(?P<t1>{TIME})(?:{DASH}(?P<t2>{TIME}))?\s*\](?!\]))"
+)
+
+# How far outside a cue a citation may land and still count as naming it. The
+# model tends to cite a cue boundary rather than its interior.
+CUE_TOLERANCE_SECONDS = 1.0
+
+
+def _clock_seconds(raw: str) -> float | None:
+    """Seconds from "M:SS", "H:MM:SS" or "HH:MM:SS.mmm". None when unparseable.
+
+    Deliberately not `vtt.timestamp_seconds`, which assumes milliseconds are
+    present and raises without them.
+    """
+    parts = raw.strip().replace(",", ".").split(":")
+    if not 2 <= len(parts) <= 3:
+        return None
+    try:
+        numbers = [float(part) for part in parts]
+    except ValueError:
+        return None
+    hours, minutes, seconds = ([0.0, *numbers] if len(parts) == 2 else numbers)
+    return hours * 3600 + minutes * 60 + seconds
+
+
+def _cue_contains(captions: list[Caption] | None, seconds: float) -> bool:
+    """Whether a cited second falls inside a cue the meeting actually has.
+
+    An invented moment looks exactly like a real one, so the only way to tell
+    is to check it against the transcript. Without this, a hallucinated
+    timestamp becomes a link that scrolls the user somewhere arbitrary.
+    """
+    if not captions:
+        return False
+    for caption in captions:
+        start = _clock_seconds(caption.start)
+        end = _clock_seconds(caption.end)
+        if start is None:
+            continue
+        upper = end if end is not None else start
+        if start - CUE_TOLERANCE_SECONDS <= seconds <= upper + CUE_TOLERANCE_SECONDS:
+            return True
+    return False
 
 
 def _is_citation(whole_match: str, body: str) -> bool:
@@ -48,6 +108,8 @@ def _is_citation(whole_match: str, body: str) -> bool:
 def resolve_markers(
     text: str,
     cards: Mapping[str, MeetingCard],
+    *,
+    captions_for: Callable[[str], list[Caption] | None] | None = None,
 ) -> tuple[str, list[ReferencedMeeting]]:
     """Validate `[[meeting:<id>]]` markers against the scope.
 
@@ -55,9 +117,40 @@ def resolve_markers(
     An out-of-scope id is repaired when it actually names a meeting title,
     and otherwise replaced with plain prose so the client never receives an
     id it cannot resolve.
+
+    A marker may also carry `@<start>-<end>`, naming a moment inside that
+    meeting. The time is checked against the meeting's real cues: a citation
+    the transcript does not support loses its time and stays a plain meeting
+    link, rather than becoming a link that scrolls somewhere arbitrary.
+    `captions_for` defaults to the transcript repository, which caches
+    parsed captions in memory, so validation costs at most one fetch per cited
+    meeting per process.
     """
     referenced: dict[str, ReferencedMeeting] = {}
     titles = {card.title.casefold(): card for card in cards.values()}
+    caption_cache: dict[str, list[Caption] | None] = {}
+    # Resolved here rather than as a default argument: a default binds at
+    # import time, which would make the repository impossible to substitute.
+    load_captions = captions_for or transcript_repository.get_captions
+
+    def captions(meeting_id: str) -> list[Caption] | None:
+        if meeting_id not in caption_cache:
+            caption_cache[meeting_id] = load_captions(meeting_id)
+        return caption_cache[meeting_id]
+
+    def valid_time(card: MeetingCard, raw: str) -> str | None:
+        """The normalized `start[-end]` when the cited moment is real."""
+        found = TIME_SUFFIX.match(raw)
+        if found is None:
+            return None
+        start = _clock_seconds(found.group(1))
+        if start is None or not _cue_contains(captions(card.meeting_id), start):
+            logger.warning(
+                "Dropped unsupported timestamp %r for meeting %s", raw, card.meeting_id
+            )
+            return None
+        end = found.group(2)
+        return f"{found.group(1)}\u2013{end}" if end else found.group(1)
 
     def lookup(raw: str) -> MeetingCard | None:
         cleaned = raw.strip().removeprefix("meeting:").strip().strip("\"'“”‘’")
@@ -75,8 +168,14 @@ def resolve_markers(
 
     def replace(match: re.Match[str]) -> str:
         body = match.group(1)
-        # One marker may carry several comma-separated meetings.
-        found = [card for card in (lookup(part) for part in body.split(",")) if card]
+        # One marker may carry several comma-separated meetings, and each may
+        # carry its own `@time`.
+        found: list[tuple[MeetingCard, str | None]] = []
+        for part in body.split(","):
+            reference, _, raw_time = part.partition("@")
+            card = lookup(reference)
+            if card is not None:
+                found.append((card, valid_time(card, raw_time) if raw_time else None))
 
         if not found:
             logger.warning("Dropped unknown meeting marker %r", body)
@@ -86,17 +185,58 @@ def resolve_markers(
             # never a citation is left alone rather than deleted.
             return "" if _is_citation(match.group(0), body) else match.group(0)
 
-        for card in found:
+        for card, _ in found:
             referenced.setdefault(card.meeting_id, ReferencedMeeting(
                 meeting_id=card.meeting_id,
                 title=card.title,
                 meeting_date=card.meeting_date,
             ))
-        return "".join(f"[[meeting:{card.meeting_id}]]" for card in found)
+        return "".join(
+            f"[[meeting:{card.meeting_id}@{moment}]]" if moment
+            else f"[[meeting:{card.meeting_id}]]"
+            for card, moment in found
+        )
 
     resolved = _cap_citation_runs(MEETING_MARKER.sub(replace, text))
+    # After the cap, so a moment the agent attributed by position is never
+    # trimmed away as if it were one more meeting citation.
+    resolved = _attribute_bare_timestamps(resolved, cards, captions)
     resolved = _drop_duplicated_titles(resolved, referenced.values())
     return _tidy_spacing(_strip_citation_debris(resolved)), list(referenced.values())
+
+
+def _attribute_bare_timestamps(
+    text: str,
+    cards: Mapping[str, MeetingCard],
+    captions: Callable[[str], list[Caption] | None],
+) -> str:
+    """Give a timestamp the meeting it was written next to.
+
+    The agent still writes bare moments despite the prompt. Reading left to
+    right, the meeting most recently cited is the one a following timestamp
+    belongs to — but only when that meeting's transcript actually contains the
+    moment. A timestamp that fails that check keeps its plain text: a link to
+    a guessed meeting is worse than no link.
+    """
+    current: str | None = None
+
+    def rewrite(match: re.Match[str]) -> str:
+        nonlocal current
+        if match.group("marker"):
+            current = match.group("mid").partition("@")[0]
+            return match.group(0)
+
+        if current is None or current not in cards:
+            return match.group(0)
+        start = _clock_seconds(match.group("t1"))
+        if start is None or not _cue_contains(captions(current), start):
+            return match.group(0)
+
+        end = match.group("t2")
+        moment = f"{match.group('t1')}\u2013{end}" if end else match.group("t1")
+        return f"[[meeting:{current}@{moment}]]"
+
+    return MARKER_OR_BARE_TIME.sub(rewrite, text)
 
 
 VALID_MARKER = re.compile(r"\[\[meeting:[^\]\n]+\]\]")
@@ -159,7 +299,7 @@ def _drop_duplicated_titles(text: str, meetings: Iterable[ReferencedMeeting]) ->
     for meeting in meetings:
         pattern = re.compile(
             rf'["“‘]?{re.escape(meeting.title)}["”’]?[,:]?\s*'
-            rf'(\[\[meeting:{re.escape(meeting.meeting_id)}\]\])',
+            rf'(\[\[meeting:{re.escape(meeting.meeting_id)}(?:@[^\]\n]*)?\]\])',
             re.IGNORECASE,
         )
         text = pattern.sub(r"\1", text)

@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 from langchain_core.messages import AIMessage
+from langgraph.errors import GraphRecursionError
 
 from app.main import app
 from app.routers import quick_chat as router_module
@@ -94,6 +95,34 @@ def test_date_range_reversed_bounds_are_rejected(client: TestClient) -> None:
     assert response.status_code == 422
 
 
+def test_a_step_limit_never_reaches_the_client_as_langgraph_wording(
+    client: TestClient, monkeypatch
+) -> None:
+    """GraphRecursionError is a RuntimeError, and the handler passes those
+    through verbatim — so without an explicit catch the user reads about a
+    `recursion_limit` config key."""
+    _seed()
+
+    class ExhaustedGraph:
+        def stream(self, _graph_input, config=None, stream_mode=None):
+            yield {"agent": {"messages": [AIMessage(content="", tool_calls=[
+                {"name": "search_scope", "args": {}, "id": "call-1"}
+            ])]}}
+            raise GraphRecursionError("Recursion limit of 12 reached without hitting a stop condition.")
+
+    monkeypatch.setattr(router_module, "quick_chat_graph", ExhaustedGraph())
+
+    events = _frames(client.post("/quick-chat/questions", json={
+        "question": "What happened everywhere?",
+        "session_id": SESSION,
+        "scope": {"kind": "last_n", "count": 5},
+    }).text)
+
+    assert events[-1]["type"] == "error"
+    assert "recursion" not in events[-1]["detail"].lower()
+    assert "narrowing the scope" in events[-1]["detail"]
+
+
 def test_question_stream_emits_step_frames_then_an_answer(
     client: TestClient, monkeypatch
 ) -> None:
@@ -110,6 +139,24 @@ def test_question_stream_emits_step_frames_then_an_answer(
     assert [event["type"] for event in events] == ["step", "step", "answer"]
     assert events[-1]["text"] == "All clear."
     assert events[-1]["meeting_count"] == 1
+
+
+def test_an_empty_synthesis_is_reported_instead_of_rendered(
+    client: TestClient, monkeypatch
+) -> None:
+    """A model that spends its whole budget thinking returns empty content;
+    forwarding that verbatim shows the user an empty answer bubble."""
+    _seed()
+    monkeypatch.setattr(router_module, "quick_chat_graph", FakeGraph("   "))
+
+    events = _frames(client.post("/quick-chat/questions", json={
+        "question": "What happened?",
+        "session_id": SESSION,
+        "scope": {"kind": "last_n", "count": 5},
+    }).text)
+
+    assert events[-1]["type"] == "error"
+    assert events[-1]["detail"]
 
 
 def test_a_valid_meeting_marker_survives_and_is_reported(
