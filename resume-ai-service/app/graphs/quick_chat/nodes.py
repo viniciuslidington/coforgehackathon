@@ -3,13 +3,14 @@ from __future__ import annotations
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from app.graphs.model import get_model
+from app.graphs.model import get_model, invoke_for_answer
 from app.graphs.quick_chat.prompts import (
     QUICK_CHAT_FINAL_ANSWER_REQUEST,
     QUICK_CHAT_FINAL_ANSWER_SYSTEM_PROMPT,
     QUICK_CHAT_SYSTEM_PROMPT,
 )
 from app.graphs.quick_chat.state import QuickChatState
+from app.graphs.tool_budget import without_pending_tool_calls
 
 
 def _catalog_text(state: QuickChatState) -> str:
@@ -53,11 +54,14 @@ def synthesize_quick_chat_answer(state: QuickChatState) -> QuickChatState:
     """Turn the agent's draft and tool evidence into the user-visible answer."""
     messages = state.get("messages", [])
     draft = messages[-1] if messages else None
-    response = get_model().invoke([
-        SystemMessage(content=QUICK_CHAT_FINAL_ANSWER_SYSTEM_PROMPT),
-        *messages,
-        HumanMessage(content=QUICK_CHAT_FINAL_ANSWER_REQUEST),
-    ])
+    response = invoke_for_answer(
+        [
+            SystemMessage(content=QUICK_CHAT_FINAL_ANSWER_SYSTEM_PROMPT),
+            *without_pending_tool_calls(messages),
+            HumanMessage(content=QUICK_CHAT_FINAL_ANSWER_REQUEST),
+        ],
+        model_factory=get_model,
+    )
     # Reuse the draft id so add_messages replaces the internal draft rather
     # than persisting it. That matters more here than in the meeting chat:
     # the draft would otherwise carry a restatement of the whole catalog into

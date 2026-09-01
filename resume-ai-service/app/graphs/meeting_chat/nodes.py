@@ -12,7 +12,8 @@ from app.graphs.meeting_chat.prompts import (
     GEOPOLITICAL_SYSTEM_PROMPT,
 )
 from app.graphs.meeting_chat.state import ChatState
-from app.graphs.model import get_model
+from app.graphs.model import get_model, invoke_for_answer
+from app.graphs.tool_budget import without_pending_tool_calls
 
 
 def run_agent(state: ChatState) -> ChatState:
@@ -38,14 +39,17 @@ def synthesize_answer(state: ChatState) -> ChatState:
     messages = state.get("messages", [])
     draft = messages[-1] if messages else None
     transcript = state.get("transcript", "")
-    response = get_model().invoke([
-        SystemMessage(content=(
-            f"{FINAL_ANSWER_SYSTEM_PROMPT}\n\n"
-            f"Full meeting content:\n{transcript}"
-        )),
-        *messages,
-        HumanMessage(content=FINAL_ANSWER_REQUEST),
-    ])
+    response = invoke_for_answer(
+        [
+            SystemMessage(content=(
+                f"{FINAL_ANSWER_SYSTEM_PROMPT}\n\n"
+                f"Full meeting content:\n{transcript}"
+            )),
+            *without_pending_tool_calls(messages),
+            HumanMessage(content=FINAL_ANSWER_REQUEST),
+        ],
+        model_factory=get_model,
+    )
     # Reuse the draft id so add_messages replaces the internal draft instead
     # of retaining it in the persistent conversation history.
     if draft is not None and getattr(draft, "id", None):

@@ -13,10 +13,13 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
+from langgraph.errors import GraphRecursionError
 
 from app.core.vtt import duration_seconds, parse_vtt, participants_from_captions, transcript_from_captions
-from app.graphs.meeting_chat.graph import chat_graph
+from app.graphs.meeting_chat.graph import MEETING_CHAT_RECURSION_LIMIT, chat_graph
 from app.graphs.meeting_chat.prompts import (
+    CHAT_EMPTY_ANSWER_MESSAGE,
+    CHAT_GAVE_UP_MESSAGE,
     INITIAL_STEP_LABEL,
     SYNTHESIS_STEP_LABEL,
     TOOL_STEP_LABELS,
@@ -179,7 +182,10 @@ def ask_meeting_question(meeting_id: str, request: QuestionRequest) -> Streaming
         "metadata": metadata,
         "messages": [HumanMessage(content=request.question)],
     }
-    config: RunnableConfig = {"configurable": {"thread_id": request.session_id}}
+    config: RunnableConfig = {
+        "configurable": {"thread_id": request.session_id},
+        "recursion_limit": MEETING_CHAT_RECURSION_LIMIT,
+    }
 
     def event_stream() -> Iterator[str]:
         yield sse(StepEvent(label=INITIAL_STEP_LABEL))
@@ -200,11 +206,20 @@ def ask_meeting_question(meeting_id: str, request: QuestionRequest) -> Streaming
                 synthesis_update = update.get("synthesize")
                 if synthesis_update:
                     for message in synthesis_update.get("messages", []):
-                        if isinstance(message, AIMessage):
-                            yield sse(AnswerEvent(
-                                text=message_text(message),
-                                caption_count=len(captions),
-                            ))
+                        if not isinstance(message, AIMessage):
+                            continue
+                        text = message_text(message)
+                        if not text.strip():
+                            yield sse(ErrorEvent(detail=CHAT_EMPTY_ANSWER_MESSAGE))
+                            continue
+                        yield sse(AnswerEvent(text=text, caption_count=len(captions)))
+        except GraphRecursionError:
+            # Caught ahead of the RuntimeError passthrough below, which it would
+            # otherwise satisfy: GraphRecursionError subclasses RecursionError,
+            # and its message names a `recursion_limit` config key that means
+            # nothing to the person reading the answer.
+            logger.exception("Meeting chat exhausted its steps for meeting=%s", meeting_id)
+            yield sse(ErrorEvent(detail=CHAT_GAVE_UP_MESSAGE))
         except Exception as exc:
             logger.exception("Meeting chat stream failed for meeting=%s", meeting_id)
             detail = str(exc) if isinstance(exc, RuntimeError) else "Could not complete the response."

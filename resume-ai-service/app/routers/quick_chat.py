@@ -13,6 +13,7 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
+from langgraph.errors import GraphRecursionError
 
 from app.graphs.quick_chat.graph import (
     QUICK_CHAT_RECURSION_LIMIT,
@@ -22,7 +23,9 @@ from app.graphs.quick_chat.graph import (
 from app.graphs.quick_chat.prompts import (
     BRIEFING_PROMPT_VERSION,
     EMPTY_SCOPE_ANSWER,
+    QUICK_CHAT_EMPTY_ANSWER_MESSAGE,
     QUICK_CHAT_FALLBACK_STEP_LABEL,
+    QUICK_CHAT_GAVE_UP_MESSAGE,
     QUICK_CHAT_INITIAL_STEP_LABEL,
     QUICK_CHAT_SYNTHESIS_STEP_LABEL,
     QUICK_CHAT_TOOL_STEP_LABELS,
@@ -153,11 +156,21 @@ def ask_quick_chat_question(request: QuickChatRequest) -> StreamingResponse:
                         if not isinstance(message, AIMessage):
                             continue
                         text, referenced = resolve_markers(message_text(message), cards_by_id)
+                        if not text.strip():
+                            yield sse(ErrorEvent(detail=QUICK_CHAT_EMPTY_ANSWER_MESSAGE))
+                            continue
                         yield sse(QuickChatAnswerEvent(
                             text=text,
                             referenced_meetings=referenced,
                             meeting_count=len(resolved.cards),
                         ))
+        except GraphRecursionError:
+            # Caught ahead of the RuntimeError passthrough below, which it
+            # would otherwise satisfy: GraphRecursionError subclasses
+            # RecursionError, and its message names a `recursion_limit` config
+            # key that means nothing to the person reading the answer.
+            logger.exception("Quick chat exhausted its steps fingerprint=%s", resolved.fingerprint)
+            yield sse(ErrorEvent(detail=QUICK_CHAT_GAVE_UP_MESSAGE))
         except Exception as exc:
             logger.exception("Quick chat stream failed fingerprint=%s", resolved.fingerprint)
             detail = str(exc) if isinstance(exc, RuntimeError) else "Could not complete the response."

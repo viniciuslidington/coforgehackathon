@@ -131,7 +131,7 @@ def test_deterministic_tool_reads_injected_meeting_state():
 
 
 def test_graph_cycles_through_tool_before_final_answer(monkeypatch):
-    monkeypatch.setattr("app.graphs.meeting_chat.nodes.get_model", lambda: ToolCallingModel())
+    monkeypatch.setattr("app.graphs.meeting_chat.nodes.get_model", lambda **_kwargs: ToolCallingModel())
     graph = build_chat_graph()
 
     updates = list(graph.stream(_graph_input("Qual foi a receita?"), stream_mode="updates"))
@@ -147,7 +147,7 @@ def test_graph_cycles_through_tool_before_final_answer(monkeypatch):
 
 def test_graph_synthesizes_reasoning_draft_into_a_final_answer(monkeypatch):
     models = iter([ReasoningDraftModel(), FinalAnswerModel()])
-    monkeypatch.setattr("app.graphs.meeting_chat.nodes.get_model", lambda: next(models))
+    monkeypatch.setattr("app.graphs.meeting_chat.nodes.get_model", lambda **_kwargs: next(models))
     graph = build_chat_graph()
 
     updates = list(graph.stream(_graph_input("Qual foi a receita?"), stream_mode="updates"))
@@ -159,7 +159,7 @@ def test_graph_synthesizes_reasoning_draft_into_a_final_answer(monkeypatch):
 
 
 def test_sqlite_checkpointer_restores_history_after_graph_is_recreated(tmp_path: Path, monkeypatch):
-    monkeypatch.setattr("app.graphs.meeting_chat.nodes.get_model", lambda: HistoryAwareModel())
+    monkeypatch.setattr("app.graphs.meeting_chat.nodes.get_model", lambda **_kwargs: HistoryAwareModel())
     checkpoint_path = tmp_path / "chat.db"
     thread_id = str(uuid4())
     config = {"configurable": {"thread_id": thread_id}}
@@ -242,7 +242,7 @@ def test_external_tool_returns_structured_failure_on_timeout(monkeypatch):
 
 
 def test_finnhub_failure_does_not_break_the_agent_answer(monkeypatch):
-    monkeypatch.setattr("app.graphs.meeting_chat.nodes.get_model", lambda: ExternalFailureAwareModel())
+    monkeypatch.setattr("app.graphs.meeting_chat.nodes.get_model", lambda **_kwargs: ExternalFailureAwareModel())
     monkeypatch.setattr(
         finnhub_service,
         "get_quote",
@@ -273,7 +273,7 @@ def test_geopolitical_tool_uses_a_dedicated_news_only_model_call(monkeypatch):
             assert "Shipping disruption" in messages[1].content
             return AIMessage(content="Análise ancorada na notícia.")
 
-    monkeypatch.setattr("app.graphs.meeting_chat.nodes.get_model", lambda: DedicatedModel())
+    monkeypatch.setattr("app.graphs.meeting_chat.nodes.get_model", lambda **_kwargs: DedicatedModel())
 
     result = get_geopolitical_analysis.invoke({"asset_or_topic": "shipping"})
 
