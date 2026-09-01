@@ -13,6 +13,8 @@ interface DetailChatProps {
   steps: string[];
   onDraftChange: (value: string) => void;
   onSend: () => void;
+  /** Jump the transcript to a moment the answer cited. */
+  onSeek: (fromSeconds: number, toSeconds: number | null) => void;
 }
 
 export function DetailChat({
@@ -22,6 +24,7 @@ export function DetailChat({
   steps,
   onDraftChange,
   onSend,
+  onSeek,
 }: DetailChatProps) {
   const bodyRef = useRef<HTMLDivElement>(null);
 
@@ -39,7 +42,7 @@ export function DetailChat({
       {/* Messages */}
       <div className={styles.body} ref={bodyRef}>
         {messages.map((m, i) => (
-          <ChatMessageBubble key={i} message={m} />
+          <ChatMessageBubble key={i} message={m} onSeek={onSeek} />
         ))}
         {asking && <AgentTrace steps={steps} />}
       </div>

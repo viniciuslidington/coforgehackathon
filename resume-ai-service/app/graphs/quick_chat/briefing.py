@@ -30,7 +30,10 @@ logger = logging.getLogger("meeting-insights")
 
 BRIEFING_DIRECT_LIMIT = 25
 BRIEFING_BATCH_SIZE = 20
-BRIEFING_DIGEST_MAX_TOKENS = 400
+# Sized against real batch output, not the prompt's 120-word target: models
+# routinely overshoot it, and a clipped digest silently drops meetings from
+# the briefing that reduces them.
+BRIEFING_DIGEST_MAX_TOKENS = 800
 MAX_KEY_POINTS = 6
 VALID_TONES = {"urgent", "teal", "muted"}
 
@@ -162,13 +165,17 @@ def stream_briefing(cards: Sequence[MeetingCard]) -> Iterator[tuple[str, Any]]:
         for index in range(0, len(cards), BRIEFING_BATCH_SIZE)
     ]
     digests: list[str] = []
+    # A clipped digest loses meetings before the reduce step ever sees them, so
+    # it counts as a truncated briefing just as much as a clipped final call.
+    digest_truncated = False
     for number, batch in enumerate(batches, start=1):
         yield "step", f"Reading meetings, batch {number} of {len(batches)}…"
         blocks = "\n\n".join(_card_block(card) for card in batch)
-        digest, _ = _invoke(
+        digest, was_truncated = _invoke(
             BRIEFING_DIGEST_SYSTEM_PROMPT, f"Meetings:\n\n{blocks}",
             max_tokens=BRIEFING_DIGEST_MAX_TOKENS,
         )
+        digest_truncated = digest_truncated or was_truncated
         digests.append(digest.strip())
 
     yield "step", "Writing the briefing…"
@@ -179,7 +186,7 @@ def stream_briefing(cards: Sequence[MeetingCard]) -> Iterator[tuple[str, Any]]:
         max_tokens=OPENROUTER_BRIEFING_MAX_TOKENS,
     )
     draft = _parse_briefing(text)
-    draft.truncated = truncated
+    draft.truncated = truncated or digest_truncated
     yield "draft", draft
 
 

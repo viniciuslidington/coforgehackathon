@@ -166,6 +166,7 @@ def get_stored_summary(meeting_id: str) -> StoredMeetingSummary | None:
 def caption_to_segment(caption: Caption) -> TranscriptSegment:
     t = format_timestamp(timestamp_seconds(caption.start))
     speaker, separator, rest = caption.text.partition(":")
-    if separator:
-        return TranscriptSegment(t=t, sp=speaker.strip(), tx=rest.strip())
-    return TranscriptSegment(t=t, sp="", tx=caption.text)
+    sp, tx = (speaker.strip(), rest.strip()) if separator else ("", caption.text)
+    # The raw cue bounds travel alongside the display string: the chat agent
+    # quotes them verbatim, so the UI needs them to resolve a citation to a cue.
+    return TranscriptSegment(t=t, sp=sp, tx=tx, start=caption.start, end=caption.end)

@@ -33,7 +33,10 @@ export interface MeetingSummaryPage {
 }
 
 export interface MeetingSegment {
-  /** Timestamp string, e.g. "00:01:20" */
+  /**
+   * Elapsed time for display, e.g. "12:45" — rounded to the second, and
+   * without the hour under an hour. Lossy: use `start` to match a citation.
+   */
   t: string;
   /** Speaker label, e.g. "CITI-FX", "Renata" */
   sp: string;
@@ -41,6 +44,13 @@ export interface MeetingSegment {
   tx: string;
   /** Optional flag label, e.g. "Deadline" */
   flag?: string;
+  /**
+   * Raw VTT cue bounds, e.g. "00:12:45.500". These are the strings the chat
+   * agent cites back, so they are what a citation resolves against. Optional
+   * only to tolerate a server that predates them.
+   */
+  start?: string;
+  end?: string;
 }
 
 export interface ChatMessage {

@@ -13,6 +13,13 @@
   transition: all 0.15s ease;
 }
 
+/* The cue a chat citation points at. The timeline has .cardActive for this;
+   the transcript had every part styled except the entry itself. */
+.entryActive {
+  background: var(--teal-bg);
+  border-left-color: var(--teal-light);
+}
+
 .meta {
   display: flex;
   align-items: center;

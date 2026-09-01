@@ -36,16 +36,71 @@
   margin-top: 6px;
   font-size: 13.5px;
   line-height: 1.6;
-  white-space: pre-wrap;
   text-wrap: pretty;
 }
 
 .user .text {
   color: var(--text-primary);
+  /* A typed message keeps the line breaks the user typed. */
+  white-space: pre-wrap;
 }
 
 .ai .text {
   color: var(--text-secondary);
+}
+
+/* Markdown blocks from an agent answer. Deliberately no `pre-wrap`: the block
+   parser already owns spacing, and preserving source newlines on top of real
+   <p>/<ul> elements would show every one of them as blank space. */
+.prose > * {
+  margin: 0;
+}
+
+.prose > * + * {
+  margin-top: 8px;
+}
+
+.prose ul,
+.prose ol {
+  padding-left: 18px;
+}
+
+.prose li + li {
+  margin-top: 4px;
+}
+
+.prose h4,
+.prose h5,
+.prose h6 {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.prose strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.prose code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--bg-9);
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+
+.prose pre {
+  overflow-x: auto;
+  padding: 8px 10px;
+  background: var(--bg-9);
+  border: 1px solid var(--border-3);
+  border-radius: 8px;
+}
+
+.prose pre code {
+  padding: 0;
+  background: none;
 }
 
 /* A meeting the agent cited: opens the meeting modal. Styled as inline text
@@ -64,6 +119,28 @@
 
 .meetingLink:hover,
 .meetingLink:focus-visible {
+  color: var(--teal-pale);
+  text-decoration-color: currentColor;
+}
+
+/* A cited moment: scrolls the transcript to that point. Monospaced so it reads
+   as a timecode rather than a title, and unbroken so a range never wraps. */
+.timeLink {
+  padding: 0 1px;
+  border: 0;
+  background: none;
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  color: var(--teal-light);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: var(--teal-border);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.timeLink:hover,
+.timeLink:focus-visible {
   color: var(--teal-pale);
   text-decoration-color: currentColor;
 }
