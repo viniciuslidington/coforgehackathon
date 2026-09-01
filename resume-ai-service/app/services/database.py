@@ -45,7 +45,8 @@ SCHEMA_STATEMENTS = (
         model TEXT NOT NULL,
         prompt_version TEXT NOT NULL,
         created_at TEXT NOT NULL,
-        last_used_at TEXT NOT NULL
+        last_used_at TEXT NOT NULL,
+        truncated INTEGER NOT NULL DEFAULT 0
     )
     """,
     """
@@ -70,6 +71,9 @@ def connection() -> Iterator[sqlite3.Connection]:
             conn.execute("ALTER TABLE meeting_summaries ADD COLUMN duration_seconds INTEGER NOT NULL DEFAULT 0")
         if "topic_embedding" not in columns:
             conn.execute("ALTER TABLE meeting_summaries ADD COLUMN topic_embedding BLOB")
+        briefing_columns = {row["name"] for row in conn.execute("PRAGMA table_info(quick_chat_briefings)")}
+        if "truncated" not in briefing_columns:
+            conn.execute("ALTER TABLE quick_chat_briefings ADD COLUMN truncated INTEGER NOT NULL DEFAULT 0")
         yield conn
         conn.commit()
     finally:
@@ -214,6 +218,7 @@ def save_briefing(
     referenced_meetings: list[dict[str, object]],
     model: str,
     prompt_version: str,
+    truncated: bool = False,
     limit: int = BRIEFING_CACHE_LIMIT,
 ) -> None:
     """Store a briefing and evict all but the `limit` most recently used."""
@@ -223,18 +228,20 @@ def save_briefing(
             INSERT INTO quick_chat_briefings (
                 fingerprint, selection_json, meeting_ids, meeting_count,
                 range_start, range_end, summary, key_points, referenced_meetings,
-                model, prompt_version, created_at, last_used_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                model, prompt_version, created_at, last_used_at, truncated)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(fingerprint) DO UPDATE SET
                 selection_json=excluded.selection_json,
                 summary=excluded.summary,
                 key_points=excluded.key_points,
                 referenced_meetings=excluded.referenced_meetings,
-                last_used_at=excluded.last_used_at
+                last_used_at=excluded.last_used_at,
+                truncated=excluded.truncated
         """, (
             fingerprint, selection_json, json.dumps(list(meeting_ids)), meeting_count,
             range_start, range_end, summary, json.dumps(key_points),
             json.dumps(referenced_meetings), model, prompt_version, now, now,
+            int(truncated),
         ))
         _evict_old_briefings(conn, limit)
 

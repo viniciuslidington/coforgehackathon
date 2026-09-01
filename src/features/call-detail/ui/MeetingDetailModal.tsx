@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { ChatMessage, MeetingSegment, MeetingSummary } from '@/entities/meeting/model/types';
 import { formatMeetingDate } from '@/entities/meeting/lib/helpers';
+import { findSegmentAt, segmentsInRange } from '@/entities/meeting/lib/transcriptTime';
 import { MeetingTimeline } from './MeetingTimeline';
 import { MeetingTranscript } from './MeetingTranscript';
 import { DetailChat } from './DetailChat';
@@ -36,6 +37,25 @@ export function MeetingDetailModal({
   onSend,
 }: MeetingDetailModalProps) {
   const [mode, setMode] = useState<'timeline' | 'transcript'>('timeline');
+  // Where a chat citation last pointed. The nonce makes clicking the same
+  // citation twice a new value, so the scroll effect re-runs.
+  const [seek, setSeek] = useState<{ from: number; to: number | null; nonce: number } | null>(null);
+
+  const onSeek = useCallback((from: number, to: number | null) => {
+    // Set from an event handler, never an effect.
+    setSeek(previous => ({ from, to, nonce: (previous?.nonce ?? 0) + 1 }));
+  }, []);
+
+  // Derived, not stored: recomputing beats keeping a second copy in sync.
+  const activeIndexes = useMemo(
+    () => (seek ? segmentsInRange(segments, seek.from, seek.to) : undefined),
+    [segments, seek],
+  );
+  const focusIndex = useMemo(
+    () => (seek ? findSegmentAt(segments, seek.from) : null),
+    [segments, seek],
+  );
+
   const date = formatMeetingDate(meeting.meeting_date);
   const duration = `${Math.floor(meeting.duration_seconds / 60)}m ${meeting.duration_seconds % 60}s`;
 
@@ -87,9 +107,19 @@ export function MeetingDetailModal({
               {segmentsError && <p className={styles.hint}>{segmentsError}</p>}
               {!segmentsLoading && !segmentsError && (
                 mode === 'timeline' ? (
-                  <MeetingTimeline segments={segments} />
+                  <MeetingTimeline
+                    segments={segments}
+                    activeIndexes={activeIndexes}
+                    focusIndex={focusIndex}
+                    focusNonce={seek?.nonce ?? 0}
+                  />
                 ) : (
-                  <MeetingTranscript segments={segments} />
+                  <MeetingTranscript
+                    segments={segments}
+                    activeIndexes={activeIndexes}
+                    focusIndex={focusIndex}
+                    focusNonce={seek?.nonce ?? 0}
+                  />
                 )
               )}
             </div>
@@ -103,6 +133,7 @@ export function MeetingDetailModal({
             steps={steps}
             onDraftChange={onDraftChange}
             onSend={onSend}
+            onSeek={onSeek}
           />
         </div>
       </div>

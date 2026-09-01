@@ -175,6 +175,9 @@ def _cached_response(row: Mapping[str, object], resolved: ResolvedScope) -> Brie
         ],
         scope=resolved.to_resolution(),
         cached=True,
+        # Persisted, so a shortened briefing keeps saying so on every reload
+        # instead of silently looking complete once it comes from cache.
+        truncated=bool(row["truncated"]),
         created_at=str(row["created_at"]),
     )
 
@@ -265,6 +268,7 @@ def _persist_draft(resolved: ResolvedScope, draft: BriefingDraft | None) -> Brie
         referenced_meetings=[meeting.model_dump() for meeting in referenced],
         model=OPENROUTER_MODEL,
         prompt_version=BRIEFING_PROMPT_VERSION,
+        truncated=draft.truncated,
     )
 
     return BriefingResponse(

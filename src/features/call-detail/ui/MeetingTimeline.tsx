@@ -1,10 +1,17 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import type { MeetingSegment } from '@/entities/meeting/model/types';
 import styles from './CallTimeline.module.css';
 
 interface MeetingTimelineProps {
   segments: MeetingSegment[];
+  /** Segments covered by the citation the user last clicked. */
+  activeIndexes?: ReadonlySet<number>;
+  /** The segment to scroll into view. */
+  focusIndex?: number | null;
+  /** Changes on every click so the same citation can be re-followed. */
+  focusNonce?: number;
 }
 
 const SPEAKER_ACCENTS = [
@@ -26,7 +33,20 @@ function getSpeakerTheme(name: string) {
   return SPEAKER_ACCENTS[Math.abs(hash) % SPEAKER_ACCENTS.length];
 }
 
-export function MeetingTimeline({ segments }: MeetingTimelineProps) {
+export function MeetingTimeline({
+  segments,
+  activeIndexes,
+  focusIndex = null,
+  focusNonce = 0,
+}: MeetingTimelineProps) {
+  const focusRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (focusIndex === null) return;
+    // DOM work only — no setState, so `react-hooks/set-state-in-effect` holds.
+    focusRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [focusIndex, focusNonce]);
+
   if (!segments || segments.length === 0) {
     return <div className={styles.empty}>No timeline segments recorded for this meeting.</div>;
   }
@@ -38,23 +58,24 @@ export function MeetingTimeline({ segments }: MeetingTimelineProps) {
         const speakerInitial = seg.sp ? seg.sp.charAt(0).toUpperCase() : '•';
         const isFirst = i === 0;
         const isLast = i === segments.length - 1;
+        const isActive = activeIndexes?.has(i) ?? false;
 
         return (
-          <div key={i} className={styles.entry}>
+          <div key={i} className={styles.entry} ref={i === focusIndex ? focusRef : undefined}>
             {/* Timestamp */}
-            <time dateTime={seg.t} className={styles.ts}>
+            <time dateTime={seg.t} className={`${styles.ts} ${isActive ? styles.tsActive : ''}`}>
               {seg.t}
             </time>
 
             {/* Continuous Rail + Node */}
             <div className={styles.rail} aria-hidden="true">
-              <div className={`${styles.railLine} ${isFirst ? styles.railHidden : ''}`} />
-              <div className={styles.node} />
-              <div className={`${styles.railLine} ${isLast ? styles.railHidden : ''}`} />
+              <div className={`${styles.railLine} ${isFirst ? styles.railHidden : ''} ${isActive ? styles.railActive : ''}`} />
+              <div className={`${styles.node} ${isActive ? styles.nodeActive : ''}`} />
+              <div className={`${styles.railLine} ${isLast ? styles.railHidden : ''} ${isActive ? styles.railActive : ''}`} />
             </div>
 
             {/* Content Card */}
-            <div className={styles.card}>
+            <div className={`${styles.card} ${isActive ? styles.cardActive : ''}`}>
               <div className={styles.cardHeader}>
                 {seg.sp && (
                   <span
@@ -80,7 +101,7 @@ export function MeetingTimeline({ segments }: MeetingTimelineProps) {
                   </span>
                 )}
               </div>
-              <div className={styles.text}>
+              <div className={`${styles.text} ${isActive ? styles.textActive : ''}`}>
                 {seg.tx}
               </div>
             </div>

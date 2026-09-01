@@ -27,6 +27,13 @@ OPENROUTER_MAX_TOKENS = int(os.getenv("OPENROUTER_MAX_TOKENS", "1200"))
 # A briefing is three paragraphs plus key points, which does not reliably fit
 # in the chat-sized default above.
 OPENROUTER_BRIEFING_MAX_TOKENS = int(os.getenv("OPENROUTER_BRIEFING_MAX_TOKENS", "1600"))
+# Reasoning models (Gemini 3.x, o-series) bill thinking tokens against the same
+# ceiling as the answer, so the budgets above can be spent entirely on thinking
+# and leave a response truncated mid-sentence. Set this to one of OpenRouter's
+# effort levels — minimal, low, medium, high — to cap thinking on such a model.
+# Empty is correct for a non-reasoning model: the field is then omitted, and
+# providers that reject an unknown `reasoning` field keep working.
+OPENROUTER_REASONING_EFFORT = os.getenv("OPENROUTER_REASONING_EFFORT", "").strip() or None
 OPENROUTER_SITE_URL = os.getenv("OPENROUTER_SITE_URL", "http://localhost:8000")
 OPENROUTER_APP_NAME = os.getenv("OPENROUTER_APP_NAME", "Meeting Insights API")
 
