@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import type { MeetingSummary } from '../model/types';
 import { formatMeetingDate, getCallType } from '../lib/helpers';
 import { PriorityBadge } from './PriorityBadge';
@@ -15,6 +16,44 @@ export function CallRow({ meeting, onOpen, showPriority = true }: CallRowProps) 
   const date = formatMeetingDate(meeting.meeting_date);
   const duration = `${Math.floor(meeting.duration_seconds / 60)}m ${meeting.duration_seconds % 60}s`;
   const callType = getCallType(meeting);
+
+  // The summary cell rests clipped to two lines and grows to the whole text
+  // while that cell is hovered. `max-height` cannot animate to `auto`, so the
+  // full height is measured and applied as an explicit pixel value.
+  const clipRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLDivElement>(null);
+  const collapsedHeightRef = useRef(0);
+  const [expandedHeight, setExpandedHeight] = useState<number | null>(null);
+  const [clipped, setClipped] = useState(false);
+
+  useEffect(() => {
+    const clip = clipRef.current;
+    const text = textRef.current;
+    if (!clip || !text) return;
+
+    // Read the resting height from the stylesheet once, while the cell is
+    // still collapsed, so the two-line limit stays defined in one place.
+    if (!collapsedHeightRef.current) {
+      collapsedHeightRef.current = parseFloat(getComputedStyle(clip).maxHeight) || 0;
+    }
+
+    // The inner text keeps its full height whether or not the clip box is
+    // open, so this stays correct mid-animation.
+    const measure = () =>
+      setClipped(text.getBoundingClientRect().height > collapsedHeightRef.current + 1);
+
+    measure();
+    // Column widths follow the panel's container queries, so re-wrapping text
+    // can make a summary start or stop overflowing without any state change.
+    const observer = new ResizeObserver(measure);
+    observer.observe(text);
+    return () => observer.disconnect();
+  }, [meeting.simple_summary]);
+
+  const expandSummary = () => {
+    const text = textRef.current;
+    if (text && clipped) setExpandedHeight(text.getBoundingClientRect().height);
+  };
 
   return (
     <article
@@ -41,8 +80,25 @@ export function CallRow({ meeting, onOpen, showPriority = true }: CallRowProps) 
 
       <div className={styles.participants}>{meeting.participants.join(', ') || 'No participants'}</div>
 
-      <div className={styles.summaryCol}>
-        <div className={styles.summaryText}>{meeting.simple_summary}</div>
+      <div
+        className={styles.summaryCol}
+        onMouseEnter={expandSummary}
+        onMouseLeave={() => setExpandedHeight(null)}
+      >
+        <div
+          ref={clipRef}
+          className={styles.summaryClip}
+          style={expandedHeight != null ? { maxHeight: expandedHeight } : undefined}
+        >
+          <div ref={textRef} className={styles.summaryText}>{meeting.simple_summary}</div>
+          {clipped && (
+            <span
+              className={styles.summaryFade}
+              data-hidden={expandedHeight != null ? 'true' : undefined}
+              aria-hidden="true"
+            />
+          )}
+        </div>
       </div>
 
       <div className={styles.keywords}>

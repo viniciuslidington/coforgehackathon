@@ -124,26 +124,35 @@ export function CallHistory({ history, filters, meetings, hasTopics, onOpenMeeti
         )}
       </div>
 
-      <div className={styles.rows} aria-live="polite">
-        {history.error && (
-          <p className={styles.message}>
-            {history.error} Check that the Meeting Insights API is running.
-          </p>
+      <div className={styles.rowsArea}>
+        <div className={styles.rows} aria-live="polite" aria-busy={history.loading}>
+          {history.error && (
+            <p className={styles.message}>
+              {history.error} Check that the Meeting Insights API is running.
+            </p>
+          )}
+          {!history.error && !history.loading && history.items.length === 0 && (
+            <p className={styles.message}>No meetings found for this date range.</p>
+          )}
+          {!history.error && !history.loading && history.items.length > 0 && meetings.length === 0 && (
+            <p className={styles.message}>No meetings match the active filter criteria.</p>
+          )}
+          {meetings.map(meeting => (
+            <CallRow
+              key={meeting.meeting_id}
+              meeting={meeting}
+              onOpen={onOpenMeeting}
+              showPriority={hasTopics}
+            />
+          ))}
+        </div>
+
+        {history.loading && (
+          <div className={styles.loadingOverlay} role="status">
+            <span className={styles.spinner} aria-hidden="true" />
+            <span className={styles.srOnly}>Loading meetings…</span>
+          </div>
         )}
-        {!history.error && !history.loading && history.items.length === 0 && (
-          <p className={styles.message}>No meetings found for this date range.</p>
-        )}
-        {!history.error && !history.loading && history.items.length > 0 && meetings.length === 0 && (
-          <p className={styles.message}>No meetings match the active filter criteria.</p>
-        )}
-        {meetings.map(meeting => (
-          <CallRow
-            key={meeting.meeting_id}
-            meeting={meeting}
-            onOpen={onOpenMeeting}
-            showPriority={hasTopics}
-          />
-        ))}
       </div>
 
       <div className={styles.pagination}>

@@ -97,15 +97,44 @@
   min-width: 0;
 }
 
-.summaryText {
+/* The summary rests at two lines and grows to the full text while the row is
+   hovered. `max-height` cannot animate to `auto`, so CallRow measures the
+   overflowing content and sets the expanded height inline. */
+.summaryClip {
+  position: relative;
+  overflow: hidden;
+  max-height: 2lh;
   font-size: 13.5px;
   line-height: 1.5;
+  transition: max-height 0.3s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.summaryText {
   color: var(--text-secondary);
   text-wrap: pretty;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+}
+
+/* Stands in for the clamp ellipsis: it marks the cut-off line while collapsed
+   and fades out as the row opens. Matches the resting row background, which
+   is the panel's — the hover tint only appears once the cell is expanding. */
+.summaryFade {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 1.15lh;
+  pointer-events: none;
+  background: linear-gradient(to bottom, transparent, var(--bg-2));
+  transition: opacity 0.18s ease;
+}
+
+.summaryFade[data-hidden='true'] {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .summaryClip,
+  .summaryFade {
+    transition: none;
+  }
 }
 
 .flags {
