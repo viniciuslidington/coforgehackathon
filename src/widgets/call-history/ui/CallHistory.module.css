@@ -220,10 +220,59 @@
   text-align: center;
 }
 
+/* Anchors the loading overlay: the scroller below cannot host it, since an
+   overlay inside it would scroll away with the stale rows. */
+.rowsArea {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .rows {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+}
+
+.loadingOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Veils whichever page is still on screen so it reads as stale. */
+  background: color-mix(in srgb, var(--bg-2) 78%, transparent);
+}
+
+.spinner {
+  width: 26px;
+  height: 26px;
+  border: 2px solid var(--border-6);
+  border-top-color: var(--teal-light);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 2.4s; }
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .message {
