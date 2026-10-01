@@ -12,3 +12,9 @@ O Quick Chat precisa responder tanto investigações direcionadas quanto síntes
 - Afirmações factuais carregam Evidence references verificáveis; Meeting Briefs aceleram a busca, mas nunca substituem o transcript como evidência.
 - O LLM não executa consultas irrestritas nem recebe transcrições completas por padrão; filtros de escopo, limites e acesso permanecem determinísticos.
 - A ingestão precisa expor um estado de indexação e permitir reprocessamento idempotente quando chunking, embeddings ou extrações mudarem.
+
+## Implementation notes
+
+- Chunks: `app/services/transcript_index.py` (caption windows of ≤90 words, versioned by `CHUNKER_VERSION`); hybrid retrieval: `app/services/retrieval.py` (FTS5 trigram bm25 + local-embedding cosine, fused by RRF, scoped by an explicit meeting-id allow-list).
+- Indexing runs at sync; sync also indexes already-summarized meetings without calling the LLM, `scripts/backfill_transcript_chunks.py` does the same from the CLI, and chats index a missing meeting on demand (bounded per call).
+- The same retrieval also powers the per-meeting chat for long meetings and the meeting-table search (`GET /meeting-summaries?q=`).

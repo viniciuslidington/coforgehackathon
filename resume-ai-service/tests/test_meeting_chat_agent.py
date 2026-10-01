@@ -11,15 +11,22 @@ from langgraph.graph import START, StateGraph
 from langgraph.prebuilt import ToolNode
 
 from app.core.vtt import Caption
+from app.graphs.meeting_chat import context as context_module
+from app.graphs.meeting_chat.context import build_meeting_context
 from app.graphs.meeting_chat.graph import build_chat_graph
+from app.graphs.meeting_chat.nodes import run_agent, synthesize_answer
+from app.graphs.meeting_chat.prompts import EXCERPTS_CONTEXT_RULE, FINAL_ANSWER_REQUEST
 from app.graphs.meeting_chat.state import ChatState
 from app.graphs.meeting_chat.tools import (
     get_geopolitical_analysis,
     get_market_quote,
+    read_transcript_around,
+    search_meeting,
     search_transcript_keyword,
 )
 from app.main import app
-from app.services import finnhub_service
+from app.services import finnhub_service, transcript_index
+from app.services.transcript_index import index_meeting
 
 
 class HistoryAwareModel:
@@ -30,7 +37,7 @@ class HistoryAwareModel:
         questions = [
             message for message in messages
             if isinstance(message, HumanMessage)
-            and not str(message.content).startswith("Sintetize agora")
+            and message.content != FINAL_ANSWER_REQUEST
         ]
         return AIMessage(content=f"questions={len(questions)}")
 
@@ -238,7 +245,7 @@ def test_external_tool_returns_structured_failure_on_timeout(monkeypatch):
 
     assert result["ok"] is False
     assert result["source"] == "Finnhub"
-    assert "tempo limite" in result["reason"]
+    assert "timed out" in result["reason"]
 
 
 def test_finnhub_failure_does_not_break_the_agent_answer(monkeypatch):
@@ -334,7 +341,7 @@ def test_meeting_question_endpoint_streams_step_tool_and_answer(monkeypatch):
         for frame in response.text.strip().split("\n\n")
     ]
     assert [event["type"] for event in events] == ["step", "step", "step", "answer"]
-    assert "citação" in events[1]["label"]
+    assert "quote" in events[1]["label"]
     assert events[-1]["caption_count"] == 1
 
 
@@ -372,3 +379,96 @@ def test_meeting_question_endpoint_only_emits_synthesized_answer(monkeypatch):
 
     assert len(answers) == 1
     assert answers[0]["text"] == "Ana informou crescimento de 12% [00:00:01]."
+
+
+LONG_MEETING = [
+    Caption(start=f"00:{minute:02d}:00.000", end=f"00:{minute:02d}:30.000", text=text)
+    for minute, text in enumerate(
+        ["Ana: Good morning, this is the rates huddle."]
+        + [f"Bo: Filler update number {n} about desk logistics and seating." for n in range(40)]
+        + ["Cy: Treasuries sold off and yields are up ten basis points."]
+        + [f"Bo: More filler {n} on the coffee machine schedule." for n in range(15)]
+    )
+]
+
+
+class PromptRecordingModel:
+    def __init__(self):
+        self.system_prompts: list[str] = []
+
+    def bind_tools(self, _tools):
+        return self
+
+    def invoke(self, messages):
+        self.system_prompts.append(str(messages[0].content))
+        return AIMessage(content="ok")
+
+
+def test_a_short_meeting_is_sent_whole():
+    context = build_meeting_context("m1", LONG_MEETING[:3], "anything")
+
+    assert "rates huddle" in context.transcript
+    assert context.excerpts == ""
+
+
+def test_a_long_meeting_is_sent_as_its_opening_and_relevant_passages(db_path, fake_embedder, monkeypatch):
+    monkeypatch.setattr(context_module, "INLINE_TRANSCRIPT_CHARS", 500)
+    monkeypatch.setattr(transcript_index.transcript_repository, "get_captions", lambda _id: LONG_MEETING)
+
+    context = build_meeting_context("m1", LONG_MEETING, "What happened to bond yields?")
+
+    assert context.transcript == ""
+    assert "rates huddle" in context.opening
+    assert "Treasuries sold off" in context.excerpts
+    assert "coffee machine" not in context.opening
+
+
+def test_a_long_meeting_without_an_index_falls_back_to_the_whole_meeting(db_path, monkeypatch):
+    monkeypatch.setattr(context_module, "INLINE_TRANSCRIPT_CHARS", 500)
+    monkeypatch.setattr(transcript_index.transcript_repository, "get_captions", lambda _id: None)
+
+    context = build_meeting_context("m1", LONG_MEETING, "yields?")
+
+    assert "Treasuries sold off" in context.transcript
+
+
+def test_agent_and_synthesis_read_excerpts_instead_of_the_full_meeting(monkeypatch):
+    model = PromptRecordingModel()
+    monkeypatch.setattr("app.graphs.meeting_chat.nodes.get_model", lambda **_kwargs: model)
+    state = {
+        "meeting_id": "m1",
+        "transcript": "",
+        "opening": "[00:00:00.000–00:00:30.000] Ana: Good morning.",
+        "excerpts": "[00:41:00.000–00:41:30.000] Cy: Treasuries sold off.",
+        "messages": [HumanMessage(content="What happened to yields?")],
+    }
+
+    run_agent(state)
+    synthesize_answer({**state, "messages": [*state["messages"], AIMessage(content="draft", id="d1")]})
+
+    agent_prompt, synthesis_prompt = model.system_prompts
+    assert EXCERPTS_CONTEXT_RULE in agent_prompt
+    assert "Treasuries sold off" in agent_prompt
+    assert "Full meeting content" not in agent_prompt
+    assert "Treasuries sold off" in synthesis_prompt
+    assert EXCERPTS_CONTEXT_RULE not in synthesis_prompt
+
+
+def test_search_meeting_finds_a_paraphrase_inside_the_current_meeting(db_path, fake_embedder):
+    index_meeting("m1", LONG_MEETING)
+    index_meeting("other", [Caption(start="00:00:01.000", end="00:00:02.000", text="Di: yields yields yields")])
+
+    result = search_meeting.invoke({"query": "duration", "state": {"meeting_id": "m1"}})
+
+    assert result["ok"] is True
+    assert any("Treasuries sold off" in passage["excerpt"] for passage in result["passages"])
+    assert all("Di:" not in passage["excerpt"] for passage in result["passages"])
+
+
+def test_read_transcript_around_returns_the_neighbourhood_of_a_moment(db_path, fake_embedder):
+    index_meeting("m1", LONG_MEETING)
+
+    result = read_transcript_around.invoke({"start": "00:41:00.000", "state": {"meeting_id": "m1"}})
+
+    assert result["ok"] is True
+    assert "Treasuries sold off" in result["excerpt"]

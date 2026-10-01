@@ -315,3 +315,14 @@
 .rows::-webkit-scrollbar-track {
   background: transparent;
 }
+
+.inlineAction {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--brand-orange-light);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

@@ -56,6 +56,13 @@ def embed_passage(text: str) -> np.ndarray:
     return vector
 
 
+def embed_passages(texts: list[str]) -> list[np.ndarray]:
+    """Embed many passages in one batched model call (transcript chunks)."""
+    if not texts:
+        return []
+    return list(_get_model().embed(texts))
+
+
 def embed_topic(topic: str) -> np.ndarray:
     """Embed a user-supplied topic, cached by normalized text."""
     key = topic.strip().lower()

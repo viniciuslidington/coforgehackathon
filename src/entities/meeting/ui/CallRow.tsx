@@ -1,18 +1,39 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { MeetingSummary } from '../model/types';
 import { formatMeetingDate, getCallType } from '../lib/helpers';
+import { formatClock, parseClockSeconds } from '../lib/transcriptTime';
 import { PriorityBadge } from './PriorityBadge';
 import styles from './CallRow.module.css';
 
 interface CallRowProps {
   meeting: MeetingSummary;
   onOpen?: (meeting: MeetingSummary) => void;
+  /** Opens the meeting scrolled to a moment, in seconds. */
+  onOpenAt?: (meeting: MeetingSummary, seconds: number) => void;
   showPriority?: boolean;
+  /** The active table search, marked inside a match snippet. */
+  highlight?: string;
 }
 
-export function CallRow({ meeting, onOpen, showPriority = true }: CallRowProps) {
+/** The snippet with every occurrence of the search term wrapped in <mark>. */
+function highlighted(text: string, term: string) {
+  const needle = term.trim().toLowerCase();
+  if (!needle) return text;
+  const parts: ReactNode[] = [];
+  const lower = text.toLowerCase();
+  let from = 0;
+  for (let at = lower.indexOf(needle); at !== -1; at = lower.indexOf(needle, from)) {
+    if (at > from) parts.push(text.slice(from, at));
+    parts.push(<mark key={at}>{text.slice(at, at + needle.length)}</mark>);
+    from = at + needle.length;
+  }
+  if (from < text.length) parts.push(text.slice(from));
+  return parts;
+}
+
+export function CallRow({ meeting, onOpen, onOpenAt, showPriority = true, highlight = '' }: CallRowProps) {
   const date = formatMeetingDate(meeting.meeting_date);
   const duration = `${Math.floor(meeting.duration_seconds / 60)}m ${meeting.duration_seconds % 60}s`;
   const callType = getCallType(meeting);
@@ -49,6 +70,14 @@ export function CallRow({ meeting, onOpen, showPriority = true }: CallRowProps) 
     observer.observe(text);
     return () => observer.disconnect();
   }, [meeting.simple_summary]);
+
+  // Only a transcript match needs explaining in the row: a hit in the title,
+  // keywords or summary is already on screen.
+  const match = meeting.match;
+  const matchSeconds = match?.start ? parseClockSeconds(match.start) : null;
+  const moment = match?.snippet && matchSeconds !== null
+    ? { seconds: matchSeconds, snippet: match.snippet, said: match.source === 'transcript' }
+    : null;
 
   const expandSummary = () => {
     const text = textRef.current;
@@ -99,6 +128,24 @@ export function CallRow({ meeting, onOpen, showPriority = true }: CallRowProps) 
             />
           )}
         </div>
+        {moment && (
+          <button
+            type="button"
+            className={styles.match}
+            onClick={event => {
+              // The row itself opens the meeting at the top.
+              event.stopPropagation();
+              if (onOpenAt) onOpenAt(meeting, moment.seconds);
+              else onOpen?.(meeting);
+            }}
+            title="Open the meeting at this moment"
+          >
+            <span className={styles.matchTime}>
+              {moment.said ? 'Said at' : 'Related at'} {formatClock(moment.seconds)}
+            </span>
+            <span className={styles.matchSnippet}>{highlighted(moment.snippet, highlight)}</span>
+          </button>
+        )}
       </div>
 
       <div className={styles.keywords}>

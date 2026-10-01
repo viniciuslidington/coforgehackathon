@@ -5,6 +5,8 @@ import type { MeetingPeriod, MeetingSummary, SortColumn, SortDirection } from '@
 import { CallRow } from '@/entities/meeting/ui/CallRow';
 import { FilterDropdown } from '@/features/call-filters/ui/FilterDropdown';
 import type { useCallFilters } from '@/features/call-filters/model/useCallFilters';
+import { MeetingSearch } from '@/features/meeting-search/ui/MeetingSearch';
+import type { useMeetingSearch } from '@/features/meeting-search/model/useMeetingSearch';
 import type { useMeetingHistory } from '../model/useMeetingHistory';
 import styles from './CallHistory.module.css';
 
@@ -27,10 +29,14 @@ interface CallHistoryProps {
   /** Already filtered and sorted by the page — the rows actually on screen. */
   meetings: MeetingSummary[];
   hasTopics: boolean;
+  search: ReturnType<typeof useMeetingSearch>;
   onOpenMeeting: (meeting: MeetingSummary) => void;
+  onOpenMeetingAt: (meeting: MeetingSummary, seconds: number) => void;
 }
 
-export function CallHistory({ history, filters, meetings, hasTopics, onOpenMeeting }: CallHistoryProps) {
+export function CallHistory({
+  history, filters, meetings, hasTopics, search, onOpenMeeting, onOpenMeetingAt,
+}: CallHistoryProps) {
   // The pagination controls below derive their disabled state from
   // client-only data (the fetched page count) and effect-driven flags. Gate
   // that behind a hydration flag so the server render and the first client
@@ -46,9 +52,12 @@ export function CallHistory({ history, filters, meetings, hasTopics, onOpenMeeti
         <div className={styles.titleGroup}>
           <div className={styles.title}>Meeting summaries</div>
           <div className={styles.count}>
-            {history.loading ? 'Loading…' : `${history.total} meetings`}
+            {history.loading
+              ? 'Loading…'
+              : `${history.total} ${history.query ? 'matching ' : ''}meetings`}
           </div>
         </div>
+        <MeetingSearch value={search.value} onChange={search.change} onClear={search.clear} />
         <div className={styles.controls}>
           <button className={styles.syncButton} onClick={history.sync} disabled={history.syncing}>
             {history.syncing ? 'Syncing…' : 'Get more meetings'}
@@ -132,7 +141,16 @@ export function CallHistory({ history, filters, meetings, hasTopics, onOpenMeeti
             </p>
           )}
           {!history.error && !history.loading && history.items.length === 0 && (
-            <p className={styles.message}>No meetings found for this date range.</p>
+            history.query ? (
+              <p className={styles.message}>
+                No meetings match “{history.query}”.{' '}
+                <button type="button" className={styles.inlineAction} onClick={search.clear}>
+                  Clear search
+                </button>
+              </p>
+            ) : (
+              <p className={styles.message}>No meetings found for this date range.</p>
+            )
           )}
           {!history.error && !history.loading && history.items.length > 0 && meetings.length === 0 && (
             <p className={styles.message}>No meetings match the active filter criteria.</p>
@@ -142,7 +160,9 @@ export function CallHistory({ history, filters, meetings, hasTopics, onOpenMeeti
               key={meeting.meeting_id}
               meeting={meeting}
               onOpen={onOpenMeeting}
+              onOpenAt={onOpenMeetingAt}
               showPriority={hasTopics}
+              highlight={history.query}
             />
           ))}
         </div>

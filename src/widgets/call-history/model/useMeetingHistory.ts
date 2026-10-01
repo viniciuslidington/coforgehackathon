@@ -12,7 +12,7 @@ import { getMeetingSummaries, syncMeetings } from '@/shared/api/meetings';
  * the table renders, and pushing it upward from inside the widget would mean
  * a state-sync effect the lint rules forbid.
  */
-export function useMeetingHistory(topics: string[], backendSort: SortKey) {
+export function useMeetingHistory(topics: string[], backendSort: SortKey, query = '') {
   const [period, setPeriod] = useState<MeetingPeriod>('all');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
@@ -28,10 +28,19 @@ export function useMeetingHistory(topics: string[], backendSort: SortKey) {
     setLoading(true);
   }
 
+  // A new search starts from the first page of its own results.
+  const [previousQuery, setPreviousQuery] = useState(query);
+  if (query !== previousQuery) {
+    setPreviousQuery(query);
+    setPage(1);
+    setLoading(true);
+    setError(null);
+  }
+
   useEffect(() => {
     const controller = new AbortController();
     let active = true;
-    getMeetingSummaries(period, page, pageSize, topics, backendSort, controller.signal)
+    getMeetingSummaries(period, page, pageSize, topics, backendSort, query, controller.signal)
       .then(result => {
         if (active) setData(result);
       })
@@ -47,7 +56,7 @@ export function useMeetingHistory(topics: string[], backendSort: SortKey) {
       active = false;
       controller.abort();
     };
-  }, [page, pageSize, period, topics, backendSort]);
+  }, [page, pageSize, period, topics, backendSort, query]);
 
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -82,20 +91,21 @@ export function useMeetingHistory(topics: string[], backendSort: SortKey) {
       setPage(1);
       // Changing the page alone does not retrigger the request when already
       // on page one, so reload the current result explicitly after syncing.
-      setData(await getMeetingSummaries(period, 1, pageSize, topics, backendSort));
+      setData(await getMeetingSummaries(period, 1, pageSize, topics, backendSort, query));
     } catch (syncError: unknown) {
       setError(syncError instanceof Error ? syncError.message : 'Could not sync meetings.');
     } finally {
       setSyncing(false);
       setLoading(false);
     }
-  }, [loading, syncing, period, pageSize, topics, backendSort]);
+  }, [loading, syncing, period, pageSize, topics, backendSort, query]);
 
   return {
     items: data?.items ?? [],
     total,
     totalPages,
     period,
+    query,
     page,
     pageSize,
     loading,

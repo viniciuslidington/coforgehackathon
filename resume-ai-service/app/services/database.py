@@ -53,6 +53,31 @@ SCHEMA_STATEMENTS = (
     CREATE INDEX IF NOT EXISTS idx_quick_chat_briefings_last_used
         ON quick_chat_briefings(last_used_at DESC)
     """,
+    # Retrieval index over transcripts. `text` is the plain spoken text that
+    # is searched and embedded; `transcript` is the same span with per-cue
+    # timestamps, which is what the agents read and cite from.
+    """
+    CREATE TABLE IF NOT EXISTS transcript_chunks (
+        meeting_id TEXT NOT NULL,
+        chunk_index INTEGER NOT NULL,
+        start TEXT NOT NULL,
+        end TEXT NOT NULL,
+        speakers TEXT NOT NULL,
+        text TEXT NOT NULL,
+        transcript TEXT NOT NULL,
+        embedding BLOB NOT NULL,
+        chunker_version TEXT NOT NULL,
+        PRIMARY KEY (meeting_id, chunk_index)
+    )
+    """,
+    # Trigram rather than unicode61: the corpus includes Mandarin and
+    # Japanese, which unicode61 cannot segment, and trigram also matches
+    # inside tokens ("2s10s", "JGB").
+    """
+    CREATE VIRTUAL TABLE IF NOT EXISTS transcript_chunks_fts USING fts5(
+        text, meeting_id UNINDEXED, chunk_index UNINDEXED, tokenize='trigram'
+    )
+    """,
 )
 
 @contextmanager
@@ -147,7 +172,107 @@ def list_summaries_for_priority(*, date_from: str | None = None) -> list[dict[st
 def delete_summary(meeting_id: str) -> bool:
     with connection() as conn:
         cursor = conn.execute("DELETE FROM meeting_summaries WHERE meeting_id = ?", (meeting_id,))
+        _delete_chunks(conn, meeting_id)
         return cursor.rowcount > 0
+
+def _delete_chunks(conn: sqlite3.Connection, meeting_id: str) -> None:
+    conn.execute("DELETE FROM transcript_chunks WHERE meeting_id = ?", (meeting_id,))
+    conn.execute("DELETE FROM transcript_chunks_fts WHERE meeting_id = ?", (meeting_id,))
+
+def replace_chunks(meeting_id: str, rows: Sequence[dict[str, object]]) -> None:
+    """Swap a meeting's whole chunk set in one transaction, so a reader never
+    sees half of an old index and half of a new one."""
+    with connection() as conn:
+        _delete_chunks(conn, meeting_id)
+        conn.executemany("""
+            INSERT INTO transcript_chunks (
+                meeting_id, chunk_index, start, end, speakers, text, transcript,
+                embedding, chunker_version)
+            VALUES (:meeting_id, :chunk_index, :start, :end, :speakers, :text,
+                    :transcript, :embedding, :chunker_version)
+        """, [{**row, "meeting_id": meeting_id} for row in rows])
+        conn.executemany(
+            "INSERT INTO transcript_chunks_fts (text, meeting_id, chunk_index) VALUES (?, ?, ?)",
+            [(row["text"], meeting_id, row["chunk_index"]) for row in rows],
+        )
+
+def chunk_index_version(meeting_id: str) -> str | None:
+    """The chunker version a meeting was indexed with, or None if it never was."""
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT MIN(chunker_version) FROM transcript_chunks WHERE meeting_id = ?",
+            (meeting_id,),
+        ).fetchone()
+    return row[0] if row else None
+
+def indexed_meeting_ids(chunker_version: str) -> set[str]:
+    """Meetings whose every chunk was built by `chunker_version`."""
+    with connection() as conn:
+        rows = conn.execute("""
+            SELECT meeting_id FROM transcript_chunks
+            GROUP BY meeting_id HAVING MIN(chunker_version) = ? AND MAX(chunker_version) = ?
+        """, (chunker_version, chunker_version)).fetchall()
+    return {row[0] for row in rows}
+
+def chunk_index_stamp() -> tuple[int, int]:
+    """Changes whenever any meeting is (re)indexed or deleted.
+
+    A re-index deletes and re-inserts, so the max rowid always grows; a delete
+    always changes the count. Callers cache the corpus keyed by this.
+    """
+    with connection() as conn:
+        count, max_rowid = conn.execute(
+            "SELECT COUNT(*), COALESCE(MAX(rowid), 0) FROM transcript_chunks"
+        ).fetchone()
+    return int(count), int(max_rowid)
+
+def list_all_chunks() -> list[dict[str, object]]:
+    with connection() as conn:
+        rows = conn.execute("""
+            SELECT meeting_id, chunk_index, start, end, text, transcript, embedding
+            FROM transcript_chunks ORDER BY meeting_id, chunk_index
+        """).fetchall()
+    return [dict(row) for row in rows]
+
+def fts_search(match: str, meeting_ids: Sequence[str], limit: int) -> list[tuple[str, int]]:
+    """(meeting_id, chunk_index) for an FTS5 MATCH expression, best bm25 first."""
+    if not meeting_ids:
+        return []
+    placeholders = ",".join("?" * len(meeting_ids))
+    with connection() as conn:
+        rows = conn.execute(f"""
+            SELECT meeting_id, chunk_index FROM transcript_chunks_fts
+            WHERE transcript_chunks_fts MATCH ? AND meeting_id IN ({placeholders})
+            ORDER BY bm25(transcript_chunks_fts) LIMIT ?
+        """, (match, *meeting_ids, limit)).fetchall()
+    return [(row[0], int(row[1])) for row in rows]
+
+def like_search(needle: str, meeting_ids: Sequence[str], limit: int) -> list[tuple[str, int]]:
+    """Substring fallback for terms too short for the trigram index."""
+    if not meeting_ids:
+        return []
+    placeholders = ",".join("?" * len(meeting_ids))
+    escaped = needle.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    with connection() as conn:
+        rows = conn.execute(f"""
+            SELECT meeting_id, chunk_index FROM transcript_chunks
+            WHERE text LIKE ? ESCAPE '\\' AND meeting_id IN ({placeholders})
+            ORDER BY meeting_id, chunk_index LIMIT ?
+        """, (f"%{escaped}%", *meeting_ids, limit)).fetchall()
+    return [(row[0], int(row[1])) for row in rows]
+
+def chunks_between(meeting_id: str, first: int, last: int) -> list[dict[str, object]]:
+    with connection() as conn:
+        rows = conn.execute("""
+            SELECT chunk_index, start, end, transcript FROM transcript_chunks
+            WHERE meeting_id = ? AND chunk_index BETWEEN ? AND ?
+            ORDER BY chunk_index
+        """, (meeting_id, first, last)).fetchall()
+    return [dict(row) for row in rows]
+
+def list_meeting_ids() -> list[str]:
+    with connection() as conn:
+        return [row[0] for row in conn.execute("SELECT meeting_id FROM meeting_summaries")]
 
 SUMMARY_COLUMNS = """
     meeting_id, title, meeting_date, participants, simple_summary,
