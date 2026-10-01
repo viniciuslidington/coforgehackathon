@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import struct
 
-from app.services import database
+import pytest
+
+from app.core.vtt import Caption
+from app.services import database, priority
 from app.services.meeting_service import compute_topic_embedding_blob, get_stored_summaries
+from app.services.transcript_index import index_meeting
 
 
 def _seed(meeting_id: str, text: str) -> None:
@@ -112,3 +116,68 @@ def test_dimension_mismatch_degrades_to_no_priority_instead_of_raising(db_path):
     page = get_stored_summaries(page=1, page_size=10, topics=["budget"])
     assert page.items[0].priority_score is None
     assert page.items[0].priority_tier is None
+
+
+def _store(meeting_id: str, summary: str, lines: list[str] | None = None) -> None:
+    database.upsert_summary(
+        meeting_id=meeting_id, title=meeting_id, meeting_date="2026-09-01", participants=[],
+        simple_summary=summary, keywords=[], duration_seconds=60,
+        topic_embedding=compute_topic_embedding_blob(summary),
+    )
+    if lines is not None:
+        index_meeting(meeting_id, [
+            Caption(start=f"00:00:{index:02d}.000", end=f"00:00:{index:02d}.900", text=text)
+            for index, text in enumerate(lines)
+        ])
+
+
+def test_a_topic_named_only_in_the_transcript_still_raises_priority(db_path, fake_embedder):
+    _store("named", "A quick desk check-in.", ["Ana: Morning.", "Bo: JGB paper looked heavy overnight."])
+    _store("silent", "A quick desk check-in.", ["Ana: Morning.", "Bo: Nothing new."])
+
+    page = get_stored_summaries(page=1, page_size=10, topics=["JGB"])
+
+    named, silent = page.items
+    assert named.meeting_id == "named"
+    assert named.priority_tier in ("high", "urgent")
+    assert named.priority_reason is not None
+    assert named.priority_reason.kind == "mentioned"
+    assert named.priority_reason.mentions == 1
+    assert named.priority_reason.start == "00:00:01.000"
+    assert "JGB" in (named.priority_reason.snippet or "")
+    assert silent.priority_score < named.priority_score
+    assert silent.priority_reason is not None
+    assert silent.priority_reason.kind != "mentioned"
+
+
+def test_the_reason_names_the_topic_that_scored_highest(db_path, fake_embedder):
+    _store("m1", "Desk check-in.", ["Bo: Brent crude jumped on the OPEC headline."])
+
+    (item,) = get_stored_summaries(page=1, page_size=10, topics=["lunch", "Energy & Crude"]).items
+
+    assert item.priority_reason is not None
+    assert item.priority_reason.topic == "Energy & Crude"
+
+
+def test_an_unindexed_meeting_keeps_the_summary_only_score(db_path, fake_embedder):
+    _store("m1", "Treasuries and yields all morning.")
+
+    (item,) = get_stored_summaries(page=1, page_size=10, topics=["rates"]).items
+
+    expected = priority.score_meeting(
+        priority.blob_to_vector(compute_topic_embedding_blob("Treasuries and yields all morning.")),
+        [priority.embed_topic("rates")],
+    )
+    assert item.priority_score == pytest.approx(expected)
+    assert item.priority_reason is not None
+    assert item.priority_reason.kind == "summary"
+    assert item.priority_reason.start is None
+
+
+def test_ties_on_score_are_broken_by_mentions(db_path, fake_embedder):
+    _store("few", "Check-in.", [f"Ana: inflation {n}" for n in range(1)] + ["Bo: ok"])
+    _store("many", "Check-in.", [f"Ana: {'word ' * 80} inflation" for _ in range(9)])
+
+    items = get_stored_summaries(page=1, page_size=10, topics=["inflation"]).items
+
+    assert [item.meeting_id for item in items][0] == "many"

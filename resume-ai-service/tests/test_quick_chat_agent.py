@@ -10,12 +10,17 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 
 from app.graphs.quick_chat import nodes as nodes_module
 from app.graphs.quick_chat.graph import build_quick_chat_graph, thread_id_for
+from app.core.vtt import Caption
 from app.graphs.quick_chat.tools import (
     get_meeting_summaries,
     get_meeting_transcript,
+    read_transcript_around,
     search_meeting_transcript,
     search_scope,
+    search_transcripts,
 )
+from app.services import transcript_index
+from app.services.transcript_index import index_meeting
 
 STATE = {
     "meeting_ids": ["in-scope"],
@@ -77,7 +82,23 @@ def test_summary_tool_returns_in_scope_meetings() -> None:
     assert result["meetings"][0]["summary"].startswith("Alex flagged")
 
 
-def test_search_never_returns_a_meeting_outside_the_scope() -> None:
+@pytest.fixture()
+def search_index(db_path, fake_embedder, monkeypatch):
+    """Both meetings indexed; R2 must never be consulted."""
+    monkeypatch.setattr(
+        transcript_index.transcript_repository, "get_captions",
+        lambda _id: (_ for _ in ()).throw(AssertionError("R2 was consulted")),
+    )
+    index_meeting("in-scope", [
+        Caption(start="00:00:01.000", end="00:00:04.000", text="Alex: The EUR/USD block is still unanswered."),
+        Caption(start="00:00:05.000", end="00:00:09.000", text="Alex: Treasuries are selling off, yields up."),
+    ])
+    index_meeting("other", [
+        Caption(start="00:00:01.000", end="00:00:04.000", text="Bo: Crude oil and EUR/USD both ripping."),
+    ])
+
+
+def test_search_never_returns_a_meeting_outside_the_scope(search_index) -> None:
     result = _invoke(search_scope, query="EUR/USD")
 
     assert result["ok"] is True
@@ -86,6 +107,54 @@ def test_search_never_returns_a_meeting_outside_the_scope() -> None:
 
 def test_search_rejects_an_empty_query() -> None:
     assert _invoke(search_scope, query="   ")["ok"] is False
+
+
+def test_search_scope_finds_a_meeting_by_what_was_said_and_cites_the_moment(search_index) -> None:
+    result = _invoke(search_scope, query="Treasuries")
+
+    (match,) = result["matches"]
+    assert match["meeting_id"] == "in-scope"
+    assert match["why"] == "mentions the term in its transcript"
+    assert match["best_moment"]["start"] == "00:00:05.000"
+
+
+def test_search_transcripts_returns_timestamped_passages_from_the_scope_only(search_index) -> None:
+    result = _invoke(search_transcripts, query="EUR/USD")
+
+    assert result["ok"] is True
+    assert {passage["meeting_id"] for passage in result["passages"]} == {"in-scope"}
+    assert result["passages"][0]["start"] == "00:00:01.000"
+    assert "unindexed" not in result
+
+
+def test_search_transcripts_refuses_out_of_scope_ids(search_index) -> None:
+    result = _invoke(search_transcripts, query="crude", meeting_ids=["other"])
+
+    assert result["ok"] is False
+    assert result["invalid_ids"] == ["other"]
+
+
+def test_search_reports_meetings_whose_transcripts_are_not_searchable(db_path, fake_embedder, monkeypatch) -> None:
+    monkeypatch.setattr(transcript_index.transcript_repository, "get_captions", lambda _id: None)
+
+    result = _invoke(search_transcripts, query="EUR/USD")
+
+    assert result["ok"] is True
+    assert result["unindexed"] == ["in-scope"]
+
+
+def test_read_transcript_around_refuses_an_out_of_scope_meeting(search_index) -> None:
+    result = _invoke(read_transcript_around, meeting_id="other", start="00:00:01.000")
+
+    assert result["ok"] is False
+    assert result["invalid_ids"] == ["other"]
+
+
+def test_read_transcript_around_returns_the_passage_at_a_moment(search_index) -> None:
+    result = _invoke(read_transcript_around, meeting_id="in-scope", start="00:00:05.000")
+
+    assert result["ok"] is True
+    assert "Treasuries" in result["excerpt"]
 
 
 class RecordingModel:

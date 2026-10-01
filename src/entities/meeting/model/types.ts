@@ -11,6 +11,29 @@ export type PriorityFilter = 'all' | 'urgent' | 'high' | 'normal';
 export type SortColumn = 'date' | 'type' | 'priority';
 export type SortDirection = 'asc' | 'desc';
 
+/**
+ * Why a meeting matched the table search. `start` is set when the evidence is
+ * a moment in the transcript (a raw cue bound, e.g. "00:12:45.500").
+ */
+export interface MeetingSearchMatch {
+  source: 'title' | 'keywords' | 'participants' | 'summary' | 'transcript' | 'related';
+  snippet: string | null;
+  start: string | null;
+}
+
+/**
+ * Why a meeting got its priority: the topic that scored highest and the
+ * evidence behind it. `start` is a raw cue bound when the evidence is in the
+ * transcript.
+ */
+export interface PriorityReason {
+  topic: string;
+  kind: 'mentioned' | 'discussed' | 'summary';
+  mentions: number;
+  start: string | null;
+  snippet: string | null;
+}
+
 export interface MeetingSummary {
   meeting_id: string;
   title: string;
@@ -22,7 +45,10 @@ export interface MeetingSummary {
   refreshed_at: string;
   priority_score?: number | null;
   priority_tier?: Priority | null;
+  priority_reason?: PriorityReason | null;
   call_type?: 'hoot' | 'group' | string | null;
+  /** Present only on results of a table search. */
+  match?: MeetingSearchMatch | null;
 }
 
 export interface MeetingSummaryPage {

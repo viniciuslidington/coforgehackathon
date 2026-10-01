@@ -355,3 +355,9 @@
   padding-top: 8px;
   line-height: 1.35;
 }
+
+.suggestedCount {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--text-dim);
+}

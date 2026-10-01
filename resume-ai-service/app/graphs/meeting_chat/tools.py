@@ -8,7 +8,11 @@ from langgraph.prebuilt import InjectedState
 
 from app.graphs.meeting_chat.nodes import synthesize_geopolitical_analysis
 from app.graphs.meeting_chat.state import ChatState
-from app.services import finnhub_service
+from app.services import finnhub_service, retrieval, transcript_index
+
+MAX_SEARCH_PASSAGES = 6
+# Below this a semantic-only passage is noise with the local model.
+MIN_SEARCH_SIMILARITY = 0.3
 
 
 def _external_failure(exc: Exception | None = None) -> dict[str, Any]:
@@ -67,6 +71,62 @@ def get_statements_by_speaker(
                 "text": statement.strip(),
             })
     return {"ok": True, "speaker": name, "statements": statements, "total": len(statements)}
+
+
+@tool
+def search_meeting(
+    query: str,
+    state: Annotated[ChatState, InjectedState],
+) -> dict[str, Any]:
+    """Find the passages of the current meeting about a topic.
+
+    Matches exact mentions and paraphrases, so it finds a discussion even
+    when it used different words. Returns timestamped excerpts, best first.
+    """
+    needle = query.strip()
+    if not needle:
+        return {"ok": False, "reason": "Provide a non-empty query."}
+    meeting_id = state.get("meeting_id", "")
+    if not transcript_index.ensure_indexed(meeting_id):
+        return {"ok": False, "reason": "This meeting cannot be searched; use search_transcript_keyword."}
+    hits = [
+        hit for hit in retrieval.search_chunks(
+            needle, [meeting_id], k=MAX_SEARCH_PASSAGES, per_meeting=MAX_SEARCH_PASSAGES,
+        )
+        if hit.lexical or hit.semantic >= MIN_SEARCH_SIMILARITY
+    ]
+    return {
+        "ok": True,
+        "query": needle,
+        "passages": [
+            {"start": hit.start, "end": hit.end, "excerpt": hit.transcript}
+            for hit in hits
+        ],
+    }
+
+
+@tool
+def read_transcript_around(
+    start: str,
+    state: Annotated[ChatState, InjectedState],
+) -> dict[str, Any]:
+    """Read the stretch of the current meeting around a timestamp.
+
+    Returns the passage containing `start` plus the passages just before and
+    after it.
+    """
+    meeting_id = state.get("meeting_id", "")
+    if not transcript_index.ensure_indexed(meeting_id):
+        return {"ok": False, "reason": "This meeting cannot be read by passage."}
+    passages = retrieval.chunk_at(meeting_id, start, radius=1)
+    if not passages:
+        return {"ok": False, "reason": "No passage of this meeting covers that moment."}
+    return {
+        "ok": True,
+        "start": passages[0].start,
+        "end": passages[-1].end,
+        "excerpt": retrieval.merge_chunks(passages),
+    }
 
 
 @tool
@@ -143,6 +203,8 @@ MEETING_CHAT_TOOLS: list[BaseTool] = [
     get_meeting_metadata,
     search_transcript_keyword,
     get_statements_by_speaker,
+    search_meeting,
+    read_transcript_around,
     resolve_symbol,
     get_market_quote,
     get_market_news,

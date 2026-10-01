@@ -16,6 +16,7 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.errors import GraphRecursionError
 
 from app.core.vtt import duration_seconds, parse_vtt, participants_from_captions, transcript_from_captions
+from app.graphs.meeting_chat.context import build_meeting_context
 from app.graphs.meeting_chat.graph import MEETING_CHAT_RECURSION_LIMIT, chat_graph
 from app.graphs.meeting_chat.prompts import (
     CHAT_EMPTY_ANSWER_MESSAGE,
@@ -25,12 +26,13 @@ from app.graphs.meeting_chat.prompts import (
     TOOL_STEP_LABELS,
 )
 from app.schemas.agent import AnswerEvent, ErrorEvent, QuestionRequest, StepEvent
-from app.schemas.meetings import RefreshResponse, StoredMeetingSummary, SummaryPage
+from app.schemas.meetings import RefreshResponse, StoredMeetingSummary, SummaryPage, TopicSuggestionsResponse
 from app.schemas.transcripts import TranscriptSegment
 from app.services.database import delete_summary, get_summary, summary_exists, summary_has_keywords, upsert_summary
-from app.services.meeting_service import caption_to_segment, compute_topic_embedding_blob, execute_overview, get_stored_summaries, get_stored_summary
+from app.services.meeting_service import caption_to_segment, compute_topic_embedding_blob, execute_overview, get_stored_summaries, get_stored_summary, topic_suggestions
 from app.services.r2_storage import get_r2_vtt_content, list_r2_vtt_files
 from app.services.sse import message_text, sse
+from app.services import transcript_index
 from app.services.transcripts import transcript_repository
 
 logger = logging.getLogger("meeting-insights")
@@ -45,6 +47,7 @@ def _sync_from_r2(*, limit: int | None) -> RefreshResponse:
     """
     processed = 0
     skipped = 0
+    indexed = 0
     file_keys = list_r2_vtt_files()
     total = len(file_keys)
     logger.info("Starting meeting sync from R2: total_available=%d limit=%s", total, limit)
@@ -54,6 +57,11 @@ def _sync_from_r2(*, limit: int | None) -> RefreshResponse:
         meeting_id = file_key.removesuffix(".vtt")
         if summary_exists(meeting_id) and summary_has_keywords(meeting_id):
             skipped += 1
+            # A meeting stored before transcript retrieval existed (or before
+            # a chunker change) is indexed here, without regenerating its
+            # summary — so the sync button doubles as the backfill.
+            if not transcript_index.is_indexed(meeting_id) and transcript_index.ensure_indexed(meeting_id):
+                indexed += 1
             logger.info(
                 "Skipping meeting %s (%d/%d): summary already has keywords and duration",
                 meeting_id,
@@ -76,6 +84,13 @@ def _sync_from_r2(*, limit: int | None) -> RefreshResponse:
         duration = duration_seconds(captions)
         topic_embedding = compute_topic_embedding_blob(f"{title} {simple_summary} {' '.join(keywords)}")
         upsert_summary(meeting_id=meeting_id, title=title, meeting_date=date.today().isoformat(), participants=participants, simple_summary=simple_summary, keywords=keywords, duration_seconds=duration, topic_embedding=topic_embedding)
+        try:
+            transcript_index.index_meeting(meeting_id, captions)
+            indexed += 1
+        except Exception:
+            # Chats fall back to indexing on demand; a failure here must not
+            # lose the summary that was just generated.
+            logger.exception("Could not index transcript for meeting %s", meeting_id)
         processed += 1
         logger.info(
             "Stored meeting %s: title=%r participants=%s duration_seconds=%d keywords=%s",
@@ -87,9 +102,10 @@ def _sync_from_r2(*, limit: int | None) -> RefreshResponse:
         )
     page = get_stored_summaries(page=1, page_size=20)
     logger.info(
-        "Meeting sync complete: processed=%d skipped=%d total_stored=%d",
+        "Meeting sync complete: processed=%d skipped=%d indexed=%d total_stored=%d",
         processed,
         skipped,
+        indexed,
         page.total,
     )
     return RefreshResponse(processed=processed, skipped=skipped, total_stored=page.total, items=page.items)
@@ -111,6 +127,15 @@ def remove_meeting_summary(meeting_id: str) -> dict[str, str]:
         raise HTTPException(status_code=404, detail=f"Meeting '{meeting_id}' not found in database.")
     return {"status": "success", "message": f"Meeting '{meeting_id}' deleted successfully."}
 
+@router.get("/topic-suggestions", response_model=TopicSuggestionsResponse)
+def get_topic_suggestions(limit: int = Query(8, ge=1, le=20)) -> TopicSuggestionsResponse:
+    """Topics worth tracking, taken from the keywords of recent meetings.
+
+    Deterministic and free: it counts keywords the summary step already
+    stored, with no model call.
+    """
+    return topic_suggestions(limit)
+
 @router.get("/meeting-summaries", response_model=SummaryPage)
 def get_meeting_summaries(
     page: int = Query(1, ge=1),
@@ -118,6 +143,7 @@ def get_meeting_summaries(
     period: Literal["day", "week", "30d", "all"] = "all",
     topics: list[str] | None = Query(None, max_length=10),
     sort: Literal["priority", "time"] = "priority",
+    q: str | None = Query(None, max_length=200),
 ) -> SummaryPage:
     """Return persisted meeting overviews, filtered by meeting date and paginated.
 
@@ -125,8 +151,13 @@ def get_meeting_summaries(
     `sort` controls ordering: "priority" orders by relevance to those topics
     (computed deterministically, no LLM); "time" orders by meeting date
     regardless of whether topics are active.
+
+    `q` filters to meetings that mention the query in their overview or
+    transcript, or are close to it in meaning; each item then carries a
+    `match` saying why. With `sort=priority` and no topics, matches are
+    ordered by relevance.
     """
-    return get_stored_summaries(page, page_size, period, topics, sort)
+    return get_stored_summaries(page, page_size, period, topics, sort, q)
 
 @router.get("/meeting-summaries/{meeting_id}", response_model=StoredMeetingSummary)
 def get_meeting_summary(meeting_id: str) -> StoredMeetingSummary:
@@ -154,7 +185,7 @@ def ask_meeting_question(meeting_id: str, request: QuestionRequest) -> Streaming
     captions = transcript_repository.get_captions(meeting_id)
     if captions is None:
         raise HTTPException(status_code=404, detail=f"No transcript found for meeting '{meeting_id}'.")
-    transcript = transcript_from_captions(captions)
+    context = build_meeting_context(meeting_id, captions, request.question)
     summary = get_summary(meeting_id) or {}
     metadata = {
         "meeting_id": meeting_id,
@@ -174,7 +205,11 @@ def ask_meeting_question(meeting_id: str, request: QuestionRequest) -> Streaming
     }
     graph_input = {
         "meeting_id": meeting_id,
-        "transcript": transcript,
+        # Every field is set each turn, so a meeting's mode and excerpts
+        # never leak from a previous question through the checkpointer.
+        "transcript": context.transcript,
+        "opening": context.opening,
+        "excerpts": context.excerpts,
         "captions": [
             {"start": caption.start, "end": caption.end, "text": caption.text}
             for caption in captions

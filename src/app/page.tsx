@@ -9,12 +9,14 @@ import { useMeetingHistory } from '@/widgets/call-history/model/useMeetingHistor
 import { QuickChat } from '@/features/quick-chat/ui/QuickChat';
 import { useCallFilters } from '@/features/call-filters/model/useCallFilters';
 import { useTopics } from '@/features/call-filters/model/useTopics';
+import { useMeetingSearch } from '@/features/meeting-search/model/useMeetingSearch';
 import { useMeetingScope } from '@/features/meeting-scope/model/useMeetingScope';
 import { useSplitLayout } from '@/features/split-layout/model/useSplitLayout';
 import { SplitHandle } from '@/features/split-layout/ui/SplitHandle';
 import { useMeetingDetail, type TranscriptSeek } from '@/features/call-detail/model/useMeetingDetail';
 import { MeetingDetailModal } from '@/features/call-detail/ui/MeetingDetailModal';
 import { getMeetingById } from '@/shared/api/meetings';
+import type { MeetingSummary } from '@/entities/meeting/model/types';
 import styles from './page.module.css';
 
 export default function ShiftBriefingPage() {
@@ -23,7 +25,8 @@ export default function ShiftBriefingPage() {
 
   const filters = useCallFilters(hasTopics);
   const backendSort = filters.sortColumn === 'priority' ? 'priority' : 'time';
-  const history = useMeetingHistory(topics, backendSort);
+  const search = useMeetingSearch();
+  const history = useMeetingHistory(topics, backendSort, search.query);
 
   // The rows actually rendered by the table. Both helpers are pure, so this
   // needs no effect — which is what lets the Quick Chat scope stay in sync
@@ -70,6 +73,13 @@ export default function ShiftBriefingPage() {
     }
   }, [visibleMeetings, detail]);
 
+  // A table search that matched inside a transcript opens at that moment.
+  const openMeetingAtMoment = useCallback(
+    (meeting: MeetingSummary, seconds: number) =>
+      detail.openMeeting(meeting, { from: seconds, to: null, nonce: Date.now() }),
+    [detail],
+  );
+
   // A Quick Chat citation names a meeting and a moment inside it. The seek
   // rides along with the open so it is in place before the transcript lands.
   const openMeetingAt = useCallback((
@@ -96,7 +106,9 @@ export default function ShiftBriefingPage() {
                 filters={filters}
                 meetings={visibleMeetings}
                 hasTopics={hasTopics}
+                search={search}
                 onOpenMeeting={detail.openMeeting}
+                onOpenMeetingAt={openMeetingAtMoment}
               />
             </div>
           )}

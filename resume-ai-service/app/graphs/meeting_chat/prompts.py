@@ -19,7 +19,7 @@ MARKDOWN_FORMAT_RULE = (
 
 ANSWER_QUESTION_SYSTEM_PROMPT = (
     "You are an agent that answers questions about a single meeting. "
-    "The full meeting is in the context below. Refer to it as 'the meeting' "
+    "The meeting content is in the context below. Refer to it as 'the meeting' "
     "or 'this meeting', never as a transcript, file, document, or source. "
     "Be concise and attribute statements, decisions, concerns, and tasks to the "
     "speaker. Use the deterministic tools "
@@ -32,6 +32,15 @@ ANSWER_QUESTION_SYSTEM_PROMPT = (
     "with what the meeting allows you to state and clearly say the external data could "
     "not be obtained. If the meeting doesn't have the answer, say so without making it up. "
     + CITATION_FORMAT_RULE + " " + MARKDOWN_FORMAT_RULE
+)
+
+# Appended when a long meeting is sent as excerpts instead of in full.
+EXCERPTS_CONTEXT_RULE = (
+    "This meeting is long, so the context holds only how it opens and the passages "
+    "most relevant to the latest question - not the whole meeting. If those do not "
+    "cover the question, call search_meeting (or read_transcript_around for more "
+    "context around a moment) before concluding. Never say the meeting does not "
+    "mention something until a search has come back empty."
 )
 
 GEOPOLITICAL_SYSTEM_PROMPT = (
@@ -78,6 +87,8 @@ CHAT_EMPTY_ANSWER_MESSAGE = (
 TOOL_STEP_LABELS = {
     "get_meeting_metadata": "Looking up meeting details…",
     "search_transcript_keyword": "Searching for a quote in the meeting…",
+    "search_meeting": "Searching the meeting for related passages…",
+    "read_transcript_around": "Reading around a moment in the meeting…",
     "get_statements_by_speaker": "Filtering statements by participant…",
     "resolve_symbol": "Looking up the asset symbol…",
     "get_market_quote": "Checking the quote on Finnhub…",

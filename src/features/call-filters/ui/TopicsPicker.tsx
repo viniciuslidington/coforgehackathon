@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Popover } from '@/shared/ui/Popover';
+import { useTopicSuggestions } from '../model/useTopicSuggestions';
 import styles from './TopicsPicker.module.css';
 
 interface TopicsPickerProps {
@@ -10,19 +11,10 @@ interface TopicsPickerProps {
   className?: string;
 }
 
-const SUGGESTED_TOPICS = [
-  'Fed & Rates',
-  'Inflation',
-  'Earnings',
-  'Tech & AI',
-  'FX & Currencies',
-  'Energy & Oil',
-  'Credit & Bonds',
-  'M&A',
-];
 
 export function TopicsPicker({ topics, onChange, className }: TopicsPickerProps) {
   const [draft, setDraft] = useState('');
+  const { suggestions, fromMeetings } = useTopicSuggestions();
 
   const addTopic = (valueToAdd?: string) => {
     const raw = valueToAdd !== undefined ? valueToAdd : draft;
@@ -176,9 +168,11 @@ export function TopicsPicker({ topics, onChange, className }: TopicsPickerProps)
 
         {/* Suggestions Section */}
         <div className={styles.section}>
-          <div className={styles.sectionTitle}>Quick Suggestions</div>
+          <div className={styles.sectionTitle}>
+            {fromMeetings ? 'Trending in recent meetings' : 'Quick Suggestions'}
+          </div>
           <div className={styles.suggestedList}>
-            {SUGGESTED_TOPICS.map((suggested) => {
+            {suggestions.map(({ topic: suggested, meetings }) => {
               const isSelected = topics.some(
                 (t) => t.toLowerCase() === suggested.toLowerCase()
               );
@@ -187,6 +181,7 @@ export function TopicsPicker({ topics, onChange, className }: TopicsPickerProps)
                   key={suggested}
                   type="button"
                   className={`${styles.suggestedChip} ${isSelected ? styles.suggestedSelected : ''}`}
+                  title={meetings ? `A keyword in ${meetings} recent ${meetings === 1 ? 'meeting' : 'meetings'}` : undefined}
                   onClick={() => {
                     if (isSelected) {
                       removeTopic(suggested);
@@ -196,6 +191,7 @@ export function TopicsPicker({ topics, onChange, className }: TopicsPickerProps)
                   }}
                 >
                   {suggested}
+                  {meetings > 0 && <span className={styles.suggestedCount}>{meetings}</span>}
                   <span className={styles.suggestedIcon}>
                     {isSelected ? '✓' : '+'}
                   </span>

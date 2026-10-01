@@ -1,18 +1,96 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { MeetingSummary } from '../model/types';
 import { formatMeetingDate, getCallType } from '../lib/helpers';
+import { formatClock, parseClockSeconds } from '../lib/transcriptTime';
 import { PriorityBadge } from './PriorityBadge';
 import styles from './CallRow.module.css';
 
 interface CallRowProps {
   meeting: MeetingSummary;
   onOpen?: (meeting: MeetingSummary) => void;
+  /** Opens the meeting scrolled to a moment, in seconds. */
+  onOpenAt?: (meeting: MeetingSummary, seconds: number) => void;
   showPriority?: boolean;
+  /** The active table search, marked inside a match snippet. */
+  highlight?: string;
 }
 
-export function CallRow({ meeting, onOpen, showPriority = true }: CallRowProps) {
+/** The snippet with every occurrence of any of the terms wrapped in <mark>. */
+function highlighted(text: string, terms: string[]) {
+  const needles = terms.map(term => term.trim().toLowerCase()).filter(Boolean);
+  if (!needles.length) return text;
+  const parts: ReactNode[] = [];
+  const lower = text.toLowerCase();
+  let from = 0;
+  while (from < text.length) {
+    // The earliest next occurrence of any term, longest first on a tie.
+    let at = -1;
+    let length = 0;
+    for (const needle of needles) {
+      const found = lower.indexOf(needle, from);
+      if (found !== -1 && (at === -1 || found < at || (found === at && needle.length > length))) {
+        at = found;
+        length = needle.length;
+      }
+    }
+    if (at === -1) break;
+    if (at > from) parts.push(text.slice(from, at));
+    parts.push(<mark key={at}>{text.slice(at, at + length)}</mark>);
+    from = at + length;
+  }
+  if (from < text.length) parts.push(text.slice(from));
+  return parts;
+}
+
+/** The parts of a composite topic ("Fed & Rates"), matching the backend's split. */
+function topicTerms(topic: string): string[] {
+  const parts = topic.split(/\s*(?:&|,|\/|\band\b)\s*/i).filter(part => part.length >= 2);
+  return [topic, ...parts];
+}
+
+interface RowEvidence {
+  seconds: number;
+  snippet: string;
+  label: string;
+  terms: string[];
+}
+
+/**
+ * The transcript moment worth showing under the summary, if any.
+ *
+ * A search match wins: it answers what the user just typed. Otherwise an
+ * Urgent or High meeting shows the evidence for its topic score, since that
+ * is what earned it the badge. A hit in the title or summary needs no line —
+ * it is already on screen.
+ */
+function rowEvidence(meeting: MeetingSummary, showPriority: boolean, searchTerm: string): RowEvidence | null {
+  const match = meeting.match;
+  if (match) {
+    const seconds = match.start ? parseClockSeconds(match.start) : null;
+    if (!match.snippet || seconds === null) return null;
+    return {
+      seconds,
+      snippet: match.snippet,
+      label: match.source === 'transcript' ? 'Said at' : 'Related at',
+      terms: [searchTerm],
+    };
+  }
+
+  const reason = meeting.priority_reason;
+  if (!showPriority || !reason || meeting.priority_tier === 'normal') return null;
+  const seconds = reason.start ? parseClockSeconds(reason.start) : null;
+  if (!reason.snippet || seconds === null) return null;
+  return {
+    seconds,
+    snippet: reason.snippet,
+    label: reason.kind === 'mentioned' ? `${reason.topic} at` : `About ${reason.topic} at`,
+    terms: reason.kind === 'mentioned' ? topicTerms(reason.topic) : [],
+  };
+}
+
+export function CallRow({ meeting, onOpen, onOpenAt, showPriority = true, highlight = '' }: CallRowProps) {
   const date = formatMeetingDate(meeting.meeting_date);
   const duration = `${Math.floor(meeting.duration_seconds / 60)}m ${meeting.duration_seconds % 60}s`;
   const callType = getCallType(meeting);
@@ -49,6 +127,8 @@ export function CallRow({ meeting, onOpen, showPriority = true }: CallRowProps) 
     observer.observe(text);
     return () => observer.disconnect();
   }, [meeting.simple_summary]);
+
+  const moment = rowEvidence(meeting, showPriority, highlight);
 
   const expandSummary = () => {
     const text = textRef.current;
@@ -99,6 +179,24 @@ export function CallRow({ meeting, onOpen, showPriority = true }: CallRowProps) 
             />
           )}
         </div>
+        {moment && (
+          <button
+            type="button"
+            className={styles.match}
+            onClick={event => {
+              // The row itself opens the meeting at the top.
+              event.stopPropagation();
+              if (onOpenAt) onOpenAt(meeting, moment.seconds);
+              else onOpen?.(meeting);
+            }}
+            title="Open the meeting at this moment"
+          >
+            <span className={styles.matchTime}>
+              {moment.label} {formatClock(moment.seconds)}
+            </span>
+            <span className={styles.matchSnippet}>{highlighted(moment.snippet, moment.terms)}</span>
+          </button>
+        )}
       </div>
 
       <div className={styles.keywords}>
@@ -109,7 +207,11 @@ export function CallRow({ meeting, onOpen, showPriority = true }: CallRowProps) 
 
       {showPriority && meeting.priority_tier && meeting.priority_score != null && (
         <div className={styles.priority}>
-          <PriorityBadge tier={meeting.priority_tier} score={meeting.priority_score} />
+          <PriorityBadge
+            tier={meeting.priority_tier}
+            score={meeting.priority_score}
+            reason={meeting.priority_reason ?? null}
+          />
         </div>
       )}
     </article>

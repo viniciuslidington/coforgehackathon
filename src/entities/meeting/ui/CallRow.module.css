@@ -169,3 +169,50 @@
 .priority {
   min-width: 96px;
 }
+
+/* A table search that matched inside the transcript: where it was said, as a
+   link that opens the meeting at that moment. */
+.match {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  width: 100%;
+  margin-top: 6px;
+  padding: 4px 6px;
+  border: 1px solid var(--teal-border);
+  border-radius: 6px;
+  background: var(--teal-bg);
+  color: var(--text-tertiary);
+  font: inherit;
+  font-size: 11.5px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.12s ease;
+}
+
+.match:hover,
+.match:focus-visible {
+  border-color: var(--teal-border-l);
+  outline: none;
+}
+
+.matchTime {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--teal-pale);
+}
+
+.matchSnippet {
+  min-width: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.matchSnippet mark {
+  background: var(--brand-orange-bg-hover);
+  color: var(--brand-orange-text);
+  border-radius: 2px;
+}

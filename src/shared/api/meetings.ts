@@ -15,12 +15,14 @@ export async function getMeetingSummaries(
   pageSize: number,
   topics: string[] = [],
   sort: SortKey = 'priority',
+  query = '',
   signal?: AbortSignal,
 ): Promise<MeetingSummaryPage> {
   const params = new URLSearchParams({ period, page: String(page), page_size: String(pageSize), sort });
   for (const topic of topics) {
     if (topic.trim()) params.append('topics', topic.trim());
   }
+  if (query.trim()) params.set('q', query.trim());
   const response = await fetch(`${API_BASE_URL}/meeting-summaries?${params}`, { signal });
   if (!response.ok) {
     throw new Error(`Could not load meetings (${response.status}).`);
@@ -71,4 +73,19 @@ export async function askMeetingQuestion(
     event => event.type === 'answer' || event.type === 'error',
     'The answer stream ended before returning a result.',
   );
+}
+
+export interface TopicSuggestion {
+  topic: string;
+  /** How many meetings in the window list this among their keywords. */
+  meetings: number;
+}
+
+export async function getTopicSuggestions(signal?: AbortSignal): Promise<TopicSuggestion[]> {
+  const response = await fetch(`${API_BASE_URL}/topic-suggestions`, { signal });
+  if (!response.ok) {
+    throw new Error(`Could not load topic suggestions (${response.status}).`);
+  }
+  const body = (await response.json()) as { suggestions: TopicSuggestion[] };
+  return body.suggestions;
 }

@@ -23,6 +23,9 @@ curl -X POST http://127.0.0.1:8000/sync-meetings
 # Read persisted summary rows, filtered by date range and paginated
 curl 'http://127.0.0.1:8000/meeting-summaries?period=30d&page=1&page_size=15'
 
+# Search meetings by overview and by what was said in the transcript
+curl 'http://127.0.0.1:8000/meeting-summaries?q=JGB'
+
 # Discover the built-in sample meetings and IDs
 curl http://127.0.0.1:8000/meetings
 
@@ -49,6 +52,34 @@ curl -X POST http://127.0.0.1:8000/questions -F 'vtt_file=@samples/product-plann
 `WebVTT upload → parser → LangGraph route → summary agent OR Q&A agent → JSON response`
 
 The parser preserves timestamps in the model context, and the Q&A agent is prompted to cite them whenever possible.
+
+## Transcript retrieval (RAG)
+
+The chats no longer send whole transcripts to the model. Each transcript is cut
+into short windows of consecutive captions (~90 words, real cue timestamps),
+embedded with the same local multilingual model used for priority, and stored
+in SQLite (`transcript_chunks` + a trigram FTS5 table). Queries fuse bm25 and
+cosine rankings with Reciprocal Rank Fusion (`app/services/retrieval.py`).
+
+- **Meeting chat** sends a short meeting whole; a longer one (over ~8k chars)
+  is sent as its opening plus the passages relevant to the question, and the
+  agent can call `search_meeting` / `read_transcript_around` for more.
+- **Quick Chat** gets `search_transcripts` and `read_transcript_around`, and
+  `search_scope` now also matches what was said, not only summaries.
+- **Table search** (`GET /meeting-summaries?q=`) filters by literal mentions in
+  the overview or transcript, or by meaning (`SEARCH_MIN_SIMILARITY`).
+
+Meetings are indexed at sync. To index meetings stored before this existed,
+either press "Get more meetings" (sync now indexes skipped meetings without
+calling the LLM) or run the backfill once:
+
+```bash
+uv run python -m scripts.backfill_transcript_chunks   # --force to rebuild all
+```
+
+Any meeting still unindexed is indexed on demand the first time a chat needs
+it. Bump `CHUNKER_VERSION` in `app/services/transcript_index.py` after
+changing chunking; the next sync re-indexes everything.
 
 ## Stored meeting overview
 
