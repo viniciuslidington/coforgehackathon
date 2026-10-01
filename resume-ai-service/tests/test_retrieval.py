@@ -147,3 +147,44 @@ def test_reindexing_refreshes_the_cached_corpus(indexed) -> None:
     index_meeting("rates-call", [_caption("00:00:01.000", "Ana: Nothing to report.")])
 
     assert not any(hit.lexical for hit in retrieval.search_chunks("Nomura", indexed))
+
+
+def test_topic_evidence_counts_mentions_and_points_at_the_first(indexed) -> None:
+    evidence = retrieval.topic_evidence("JGB", indexed)
+
+    assert evidence["rates-call"].mentions == 1
+    assert evidence["rates-call"].moment is not None
+    assert evidence["rates-call"].moment.start == "00:00:09.000"
+    assert evidence["oil-call"].mentions == 0
+
+
+def test_topic_evidence_splits_composite_topics(indexed) -> None:
+    evidence = retrieval.topic_evidence("Energy & Crude", indexed)
+
+    assert evidence["oil-call"].mentions == 1
+    assert evidence["rates-call"].mentions == 0
+
+
+def test_topic_evidence_respects_the_allow_list(indexed) -> None:
+    assert set(retrieval.topic_evidence("crude", ["rates-call"])) == {"rates-call"}
+
+
+def test_topic_evidence_omits_meetings_without_an_index(indexed) -> None:
+    assert retrieval.topic_evidence("crude", ["never-indexed"]) == {}
+
+
+def test_topic_evidence_measures_unnamed_discussion(indexed) -> None:
+    evidence = retrieval.topic_evidence("bullion", indexed)
+    rates = retrieval.topic_evidence("treasuries", indexed)
+
+    # "treasuries" is a paraphrase of the rates call; nothing is about gold.
+    assert rates["rates-call"].chunk_cosine > rates["lunch-chat"].chunk_cosine
+    assert all(item.mentions == 0 for item in evidence.values())
+
+
+def test_topic_evidence_is_recomputed_after_a_reindex(indexed) -> None:
+    assert retrieval.topic_evidence("JGB", indexed)["rates-call"].mentions == 1
+
+    index_meeting("rates-call", [_caption("00:00:01.000", "Ana: Nothing to report.")])
+
+    assert retrieval.topic_evidence("JGB", indexed)["rates-call"].mentions == 0

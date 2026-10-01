@@ -74,3 +74,18 @@ export async function askMeetingQuestion(
     'The answer stream ended before returning a result.',
   );
 }
+
+export interface TopicSuggestion {
+  topic: string;
+  /** How many meetings in the window list this among their keywords. */
+  meetings: number;
+}
+
+export async function getTopicSuggestions(signal?: AbortSignal): Promise<TopicSuggestion[]> {
+  const response = await fetch(`${API_BASE_URL}/topic-suggestions`, { signal });
+  if (!response.ok) {
+    throw new Error(`Could not load topic suggestions (${response.status}).`);
+  }
+  const body = (await response.json()) as { suggestions: TopicSuggestion[] };
+  return body.suggestions;
+}

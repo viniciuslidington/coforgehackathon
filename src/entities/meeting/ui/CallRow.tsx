@@ -17,20 +17,77 @@ interface CallRowProps {
   highlight?: string;
 }
 
-/** The snippet with every occurrence of the search term wrapped in <mark>. */
-function highlighted(text: string, term: string) {
-  const needle = term.trim().toLowerCase();
-  if (!needle) return text;
+/** The snippet with every occurrence of any of the terms wrapped in <mark>. */
+function highlighted(text: string, terms: string[]) {
+  const needles = terms.map(term => term.trim().toLowerCase()).filter(Boolean);
+  if (!needles.length) return text;
   const parts: ReactNode[] = [];
   const lower = text.toLowerCase();
   let from = 0;
-  for (let at = lower.indexOf(needle); at !== -1; at = lower.indexOf(needle, from)) {
+  while (from < text.length) {
+    // The earliest next occurrence of any term, longest first on a tie.
+    let at = -1;
+    let length = 0;
+    for (const needle of needles) {
+      const found = lower.indexOf(needle, from);
+      if (found !== -1 && (at === -1 || found < at || (found === at && needle.length > length))) {
+        at = found;
+        length = needle.length;
+      }
+    }
+    if (at === -1) break;
     if (at > from) parts.push(text.slice(from, at));
-    parts.push(<mark key={at}>{text.slice(at, at + needle.length)}</mark>);
-    from = at + needle.length;
+    parts.push(<mark key={at}>{text.slice(at, at + length)}</mark>);
+    from = at + length;
   }
   if (from < text.length) parts.push(text.slice(from));
   return parts;
+}
+
+/** The parts of a composite topic ("Fed & Rates"), matching the backend's split. */
+function topicTerms(topic: string): string[] {
+  const parts = topic.split(/\s*(?:&|,|\/|\band\b)\s*/i).filter(part => part.length >= 2);
+  return [topic, ...parts];
+}
+
+interface RowEvidence {
+  seconds: number;
+  snippet: string;
+  label: string;
+  terms: string[];
+}
+
+/**
+ * The transcript moment worth showing under the summary, if any.
+ *
+ * A search match wins: it answers what the user just typed. Otherwise an
+ * Urgent or High meeting shows the evidence for its topic score, since that
+ * is what earned it the badge. A hit in the title or summary needs no line —
+ * it is already on screen.
+ */
+function rowEvidence(meeting: MeetingSummary, showPriority: boolean, searchTerm: string): RowEvidence | null {
+  const match = meeting.match;
+  if (match) {
+    const seconds = match.start ? parseClockSeconds(match.start) : null;
+    if (!match.snippet || seconds === null) return null;
+    return {
+      seconds,
+      snippet: match.snippet,
+      label: match.source === 'transcript' ? 'Said at' : 'Related at',
+      terms: [searchTerm],
+    };
+  }
+
+  const reason = meeting.priority_reason;
+  if (!showPriority || !reason || meeting.priority_tier === 'normal') return null;
+  const seconds = reason.start ? parseClockSeconds(reason.start) : null;
+  if (!reason.snippet || seconds === null) return null;
+  return {
+    seconds,
+    snippet: reason.snippet,
+    label: reason.kind === 'mentioned' ? `${reason.topic} at` : `About ${reason.topic} at`,
+    terms: reason.kind === 'mentioned' ? topicTerms(reason.topic) : [],
+  };
 }
 
 export function CallRow({ meeting, onOpen, onOpenAt, showPriority = true, highlight = '' }: CallRowProps) {
@@ -71,13 +128,7 @@ export function CallRow({ meeting, onOpen, onOpenAt, showPriority = true, highli
     return () => observer.disconnect();
   }, [meeting.simple_summary]);
 
-  // Only a transcript match needs explaining in the row: a hit in the title,
-  // keywords or summary is already on screen.
-  const match = meeting.match;
-  const matchSeconds = match?.start ? parseClockSeconds(match.start) : null;
-  const moment = match?.snippet && matchSeconds !== null
-    ? { seconds: matchSeconds, snippet: match.snippet, said: match.source === 'transcript' }
-    : null;
+  const moment = rowEvidence(meeting, showPriority, highlight);
 
   const expandSummary = () => {
     const text = textRef.current;
@@ -141,9 +192,9 @@ export function CallRow({ meeting, onOpen, onOpenAt, showPriority = true, highli
             title="Open the meeting at this moment"
           >
             <span className={styles.matchTime}>
-              {moment.said ? 'Said at' : 'Related at'} {formatClock(moment.seconds)}
+              {moment.label} {formatClock(moment.seconds)}
             </span>
-            <span className={styles.matchSnippet}>{highlighted(moment.snippet, highlight)}</span>
+            <span className={styles.matchSnippet}>{highlighted(moment.snippet, moment.terms)}</span>
           </button>
         )}
       </div>
@@ -156,7 +207,11 @@ export function CallRow({ meeting, onOpen, onOpenAt, showPriority = true, highli
 
       {showPriority && meeting.priority_tier && meeting.priority_score != null && (
         <div className={styles.priority}>
-          <PriorityBadge tier={meeting.priority_tier} score={meeting.priority_score} />
+          <PriorityBadge
+            tier={meeting.priority_tier}
+            score={meeting.priority_score}
+            reason={meeting.priority_reason ?? null}
+          />
         </div>
       )}
     </article>

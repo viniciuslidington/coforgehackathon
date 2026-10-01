@@ -7,6 +7,7 @@ float vectors and never imports fastembed directly.
 """
 from __future__ import annotations
 
+import re
 import warnings
 from typing import Literal
 
@@ -21,6 +22,20 @@ MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 # midpoint.
 URGENT_THRESHOLD = 55.0
 HIGH_THRESHOLD = 30.0
+
+# Transcript evidence (see `combine`). A literal mention of a topic the user
+# asked for is strong evidence on its own, so one mention lifts a meeting to
+# at least High, and each further line that mentions it adds a step.
+# Urgent from mentions alone takes five lines that name it — the topic was
+# discussed, not just named. Calibrated on this corpus, like the thresholds.
+MENTION_BASE = HIGH_THRESHOLD
+MENTION_STEP = 6.0
+MENTION_MAX_STEPS = 4
+MENTION_BONUS = 5.0
+# A meeting's transcript similarity is the mean of its best few passages: the
+# single best one is noise, since nearly every finance chat has one passage
+# loosely similar to a short topic.
+TOP_CHUNKS = 3
 
 _model: TextEmbedding | None = None
 _topic_cache: dict[str, np.ndarray] = {}
@@ -101,3 +116,50 @@ def tier_for_score(score: float) -> Literal["urgent", "high", "normal"]:
     if score >= HIGH_THRESHOLD:
         return "high"
     return "normal"
+
+
+# Splits composite topics such as "Fed & Rates" or "FX, Rates and Credit".
+TOPIC_SEPARATOR = re.compile(r"\s*(?:&|,|/|\band\b)\s*", re.IGNORECASE)
+
+
+def topic_terms(topic: str) -> list[str]:
+    """The phrases whose literal mention counts as mentioning a topic.
+
+    The whole topic, plus each part of a composite one. Parts shorter than two
+    characters are dropped; a topic that is itself a symbol ("M&A") is kept
+    whole.
+    """
+    whole = topic.strip()
+    if not whole:
+        return []
+    parts = [part for part in TOPIC_SEPARATOR.split(whole) if len(part) >= 2]
+    return list(dict.fromkeys([whole, *parts]))
+
+
+def mention_pattern(term: str) -> re.Pattern[str]:
+    """A whole-word, case-insensitive match that also accepts a plural or
+    possessive ("JGB" matches "JGBs", "Fed's"), so "oil" never matches "toil".
+
+    A term with no letters from a space-separated script (e.g. CJK) has no
+    word boundaries to anchor on, so it matches as a substring instead.
+    """
+    escaped = re.escape(term)
+    if not re.search(r"[A-Za-z0-9\u00C0-\u024F\u0400-\u04FF]", term):
+        return re.compile(escaped)
+    return re.compile(rf"(?<!\w){escaped}(?:s|es|'s)?(?!\w)", re.IGNORECASE)
+
+
+def combine(summary_cosine: float, chunk_cosine: float | None, mentions: int) -> float:
+    """0-100 relevance of one meeting to one topic.
+
+    `summary_cosine` compares the topic with the stored overview;
+    `chunk_cosine` is the mean of the best TOP_CHUNKS transcript passages, or
+    None when the meeting has no transcript index; `mentions` counts
+    transcript lines that literally mention the topic.
+    """
+    semantic = max(0.0, summary_cosine, chunk_cosine or 0.0) * 100.0
+    if mentions <= 0:
+        return semantic
+    floor = MENTION_BASE + MENTION_STEP * min(mentions - 1, MENTION_MAX_STEPS)
+    return min(100.0, max(semantic, floor) + MENTION_BONUS)
+

@@ -453,3 +453,94 @@ def rank_meetings(query: str, meetings: Sequence[MeetingText]) -> list[MeetingMa
         key=lambda match: (match.lexical_source is not None, match.score),
         reverse=True,
     )
+
+
+@dataclass(frozen=True)
+class TopicEvidence:
+    """What one meeting's transcript says about one topic."""
+    # Mean cosine of the meeting's best priority.TOP_CHUNKS passages.
+    chunk_cosine: float
+    # Cues (transcript lines) that literally mention the topic
+    # (see priority.mention_pattern).
+    mentions: int
+    # The first cue that mentions the topic, else the most similar passage.
+    moment: Moment | None
+
+
+# Evidence for every indexed meeting, per topic, for the current index stamp.
+# Topics come from a short user-picked list, so a handful of entries covers
+# paging through the table without recomputing.
+_EVIDENCE_CACHE_SIZE = 32
+_evidence_cache: dict[tuple[str, tuple[int, int]], dict[str, TopicEvidence]] = {}
+
+
+def topic_evidence(topic: str, meeting_ids: Sequence[str]) -> dict[str, TopicEvidence]:
+    """Transcript evidence for a topic, for each allowed meeting that has an index.
+
+    A meeting without chunks is absent from the result, so the caller can
+    fall back to the summary-only score for it.
+    """
+    corpus = _corpus()
+    key = (topic.strip().casefold(), database.chunk_index_stamp())
+    evidence = _evidence_cache.get(key)
+    if evidence is None:
+        evidence = _all_topic_evidence(corpus, topic)
+        if len(_evidence_cache) >= _EVIDENCE_CACHE_SIZE:
+            _evidence_cache.pop(next(iter(_evidence_cache)))
+        _evidence_cache[key] = evidence
+    return {mid: evidence[mid] for mid in meeting_ids if mid in evidence}
+
+
+def _all_topic_evidence(corpus: _Corpus, topic: str) -> dict[str, TopicEvidence]:
+    patterns = [priority.mention_pattern(term) for term in priority.topic_terms(topic)]
+    query_vector = _query_vector(topic)
+    similarities = _semantic_scores(corpus, query_vector, list(corpus.positions))
+
+    evidence: dict[str, TopicEvidence] = {}
+    for meeting_id, positions in corpus.positions.items():
+        ordered = sorted(int(position) for position in positions)
+        mentioning = [
+            position for position in ordered
+            if any(pattern.search(str(corpus.rows[position]["text"])) for pattern in patterns)
+        ]
+        # Count cues, not chunks: neighbouring chunks share a caption, so one
+        # sentence would otherwise count twice.
+        mentioning_cues = {
+            line
+            for position in mentioning
+            for line in str(corpus.rows[position]["transcript"]).splitlines()
+            if any(pattern.search(line) for pattern in patterns)
+        }
+        scores = sorted((similarities.get(position, 0.0) for position in ordered), reverse=True)
+        top = scores[:priority.TOP_CHUNKS]
+        chunk_cosine = float(np.mean(top)) if top else 0.0
+
+        moment = None
+        if mentioning:
+            hit = _hit(corpus, mentioning[0], lexical=True, semantic=0.0, score=0.0)
+            moment = _moment_matching(hit, patterns)
+        elif similarities:
+            best = max(ordered, key=lambda position: similarities.get(position, 0.0))
+            moment = moment_in(_hit(corpus, best, lexical=False, semantic=0.0, score=0.0), "")
+        evidence[meeting_id] = TopicEvidence(
+            chunk_cosine=round(chunk_cosine, 4),
+            mentions=len(mentioning_cues),
+            moment=moment,
+        )
+    return evidence
+
+
+def _moment_matching(hit: ChunkHit, patterns: Sequence[re.Pattern[str]]) -> Moment:
+    """The first cue in a chunk that one of the patterns matches."""
+    for line in hit.transcript.splitlines():
+        cue = TRANSCRIPT_LINE.match(line)
+        if cue is None:
+            continue
+        for pattern in patterns:
+            found = pattern.search(cue.group("text"))
+            if found:
+                return Moment(
+                    start=cue.group("start"),
+                    snippet=_clip(cue.group("text"), found.group(0).casefold()),
+                )
+    return moment_in(hit, "")

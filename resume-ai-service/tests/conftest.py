@@ -46,4 +46,5 @@ def fake_embedder(monkeypatch: pytest.MonkeyPatch) -> FakeEmbeddingModel:
     monkeypatch.setattr(priority, "_get_model", lambda: model)
     monkeypatch.setattr(priority, "_topic_cache", {})
     monkeypatch.setattr(retrieval, "_cache", None)
+    monkeypatch.setattr(retrieval, "_evidence_cache", {})
     return model

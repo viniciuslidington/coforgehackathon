@@ -145,3 +145,64 @@ def test_sync_indexes_stored_meetings_without_calling_the_llm(db_path, fake_embe
     assert response.status_code == 200
     assert response.json()["skipped"] == 1
     assert transcript_index.is_indexed("m1")
+
+
+def _meeting(meeting_id: str, keywords: list[str], meeting_date: str = "2026-09-10", participants: list[str] | None = None) -> None:
+    database.upsert_summary(
+        meeting_id=meeting_id, title=meeting_id, meeting_date=meeting_date,
+        participants=participants or ["Ana"], simple_summary="s", keywords=keywords,
+        duration_seconds=60,
+    )
+
+
+def test_topic_suggestions_rank_keywords_by_how_many_meetings_share_them(db_path, fake_embedder):
+    _meeting("m1", ["CPI", "Brent"])
+    _meeting("m2", ["cpi", "Brent"])
+    _meeting("m3", ["CPI", "gold"])
+    _meeting("m4", ["gold", "oil"])
+
+    body = client.get("/topic-suggestions", params={"limit": 3}).json()
+
+    assert body["suggestions"] == [
+        {"topic": "CPI", "meetings": 3},
+        {"topic": "Brent", "meetings": 2},
+        {"topic": "gold", "meetings": 2},
+    ]
+
+
+def test_topic_suggestions_skip_one_off_keywords_and_participant_names(db_path, fake_embedder):
+    _meeting("m1", ["Ana", "CPI", "once"], participants=["Ana"])
+    _meeting("m2", ["Ana", "CPI"], participants=["Ana"])
+
+    topics = [item["topic"] for item in client.get("/topic-suggestions").json()["suggestions"]]
+
+    assert topics == ["CPI"]
+
+
+def test_topic_suggestions_merge_keywords_with_the_same_meaning(db_path, fake_embedder):
+    # The fake model maps "yields" and "treasuries" to the same concept.
+    _meeting("m1", ["yields", "treasuries"])
+    _meeting("m2", ["yields", "treasuries"])
+    _meeting("m3", ["yields"])
+
+    topics = [item["topic"] for item in client.get("/topic-suggestions").json()["suggestions"]]
+
+    assert topics == ["yields"]
+
+
+def test_topic_suggestions_prefer_recent_meetings_and_fall_back_to_all(db_path, fake_embedder):
+    for index in range(2):
+        _meeting(f"old{index}", ["oil"], meeting_date="2026-01-01")
+        _meeting(f"new{index}", ["gold"], meeting_date="2026-09-10")
+
+    recent = client.get("/topic-suggestions", params={"limit": 1}).json()
+    padded = client.get("/topic-suggestions", params={"limit": 2}).json()
+
+    assert [item["topic"] for item in recent["suggestions"]] == ["gold"]
+    assert recent["date_from"] == "2026-09-04"
+    assert {item["topic"] for item in padded["suggestions"]} == {"gold", "oil"}
+    assert padded["date_from"] is None
+
+
+def test_topic_suggestions_are_empty_without_meetings(db_path):
+    assert client.get("/topic-suggestions").json()["suggestions"] == []

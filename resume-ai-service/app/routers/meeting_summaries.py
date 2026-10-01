@@ -26,10 +26,10 @@ from app.graphs.meeting_chat.prompts import (
     TOOL_STEP_LABELS,
 )
 from app.schemas.agent import AnswerEvent, ErrorEvent, QuestionRequest, StepEvent
-from app.schemas.meetings import RefreshResponse, StoredMeetingSummary, SummaryPage
+from app.schemas.meetings import RefreshResponse, StoredMeetingSummary, SummaryPage, TopicSuggestionsResponse
 from app.schemas.transcripts import TranscriptSegment
 from app.services.database import delete_summary, get_summary, summary_exists, summary_has_keywords, upsert_summary
-from app.services.meeting_service import caption_to_segment, compute_topic_embedding_blob, execute_overview, get_stored_summaries, get_stored_summary
+from app.services.meeting_service import caption_to_segment, compute_topic_embedding_blob, execute_overview, get_stored_summaries, get_stored_summary, topic_suggestions
 from app.services.r2_storage import get_r2_vtt_content, list_r2_vtt_files
 from app.services.sse import message_text, sse
 from app.services import transcript_index
@@ -126,6 +126,15 @@ def remove_meeting_summary(meeting_id: str) -> dict[str, str]:
     if not delete_summary(meeting_id):
         raise HTTPException(status_code=404, detail=f"Meeting '{meeting_id}' not found in database.")
     return {"status": "success", "message": f"Meeting '{meeting_id}' deleted successfully."}
+
+@router.get("/topic-suggestions", response_model=TopicSuggestionsResponse)
+def get_topic_suggestions(limit: int = Query(8, ge=1, le=20)) -> TopicSuggestionsResponse:
+    """Topics worth tracking, taken from the keywords of recent meetings.
+
+    Deterministic and free: it counts keywords the summary step already
+    stored, with no model call.
+    """
+    return topic_suggestions(limit)
 
 @router.get("/meeting-summaries", response_model=SummaryPage)
 def get_meeting_summaries(

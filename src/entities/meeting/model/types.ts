@@ -21,6 +21,19 @@ export interface MeetingSearchMatch {
   start: string | null;
 }
 
+/**
+ * Why a meeting got its priority: the topic that scored highest and the
+ * evidence behind it. `start` is a raw cue bound when the evidence is in the
+ * transcript.
+ */
+export interface PriorityReason {
+  topic: string;
+  kind: 'mentioned' | 'discussed' | 'summary';
+  mentions: number;
+  start: string | null;
+  snippet: string | null;
+}
+
 export interface MeetingSummary {
   meeting_id: string;
   title: string;
@@ -32,6 +45,7 @@ export interface MeetingSummary {
   refreshed_at: string;
   priority_score?: number | null;
   priority_tier?: Priority | null;
+  priority_reason?: PriorityReason | null;
   call_type?: 'hoot' | 'group' | string | null;
   /** Present only on results of a table search. */
   match?: MeetingSearchMatch | null;
